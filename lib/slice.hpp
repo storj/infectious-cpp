@@ -26,7 +26,7 @@ protected:
 public:
 	Slice() : Slice(0, 0) {}
 
-	Slice(int num_elements)
+	explicit Slice(int num_elements)
 		: vals {std::make_shared<std::vector<T>>(num_elements)}
 		, start_index {0}
 		, end_index {num_elements}
@@ -38,15 +38,21 @@ public:
 		, end_index {num_elements}
 	{}
 
-	Slice(const Slice&) = default;
-	Slice(Slice&&) = default;
-	Slice& operator=(const Slice&) = default;
-	Slice& operator=(Slice&&) = default;
+	Slice(std::initializer_list<T> init)
+		: vals {std::make_shared<std::vector<T>>(std::move(init))}
+		, start_index {0}
+		, end_index {static_cast<int>(vals->size())}
+	{}
+
+	Slice(const Slice<T>&) = default;
+	Slice(Slice<T>&&) = default;
+	Slice<T>& operator=(const Slice<T>&) = default;
+	Slice<T>& operator=(Slice<T>&&) = default;
 
 	using value_type = T;
 
 	int size() const {
-		return start_index - end_index;
+		return end_index - start_index;
 	}
 
 	T& operator[](int n) {
@@ -93,14 +99,14 @@ public:
 		end_index++;
 	}
 
-	Slice subspan(int start_at) {
+	Slice slice(int start_at) {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		return Slice<T>(vals, start_index + start_at, end_index);
 	}
 
-	Slice subspan(int start_at, int end_at) {
+	Slice slice(int start_at, int end_at) {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
@@ -110,14 +116,14 @@ public:
 		return Slice<T>(vals, start_index + start_at, start_index + end_at);
 	}
 
-	const Slice subspan(int start_at) const {
+	const Slice slice(int start_at) const {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		return Slice<T>(vals, start_index + start_at, end_index);
 	}
 
-	const Slice subspan(int start_at, int end_at) const {
+	const Slice slice(int start_at, int end_at) const {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
@@ -125,6 +131,41 @@ public:
 			throw std::out_of_range("end_at out of range");
 		}
 		return Slice<T>(vals, start_index + start_at, start_index + end_at);
+	}
+
+	bool operator==(const Slice<T>& other) const {
+		if (size() != other.size()) {
+			return false;
+		}
+		for (int i = 0; i < size(); ++i) {
+			if (operator[](i) != other[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	int operator<=>(const Slice<T>& other) const {
+		for (int i = 0; i < size(); ++i) {
+			if (i >= other.size()) {
+				return 1;
+			}
+			if (operator[](i) < other[i]) {
+				return -1;
+			}
+			if (operator[](i) > other[i]) {
+				return 1;
+			}
+		}
+		if (other.size() > size()) {
+			return -1;
+		}
+		return 0;
+	}
+
+	Slice<T> copy() const {
+		auto new_vec = std::make_shared<std::vector<T>>(begin(), end());
+		return Slice(std::move(new_vec), 0, size());
 	}
 
 protected:
@@ -152,14 +193,14 @@ public:
 		return static_cast<Subclass&>(operator=(static_cast<Slice<T>&&>(t)));
 	}
 
-	Subclass subspan(int start_at) {
+	Subclass slice(int start_at) {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		return Subclass(this->vals, this->start_index + start_at, this->end_index);
 	}
 
-	Subclass subspan(int start_at, int end_at) {
+	Subclass slice(int start_at, int end_at) {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}
@@ -169,14 +210,14 @@ public:
 		return Subclass(this->vals, this->start_index + start_at, this->start_index + end_at);
 	}
 
-	const Subclass subspan(int start_at) const {
+	const Subclass slice(int start_at) const {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		return Subclass(this->vals, this->start_index + start_at, this->end_index);
 	}
 
-	const Subclass subspan(int start_at, int end_at) const {
+	const Subclass slice(int start_at, int end_at) const {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}

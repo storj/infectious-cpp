@@ -7,7 +7,7 @@
 
 namespace infectious {
 
-int FEC::Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) {
+int FEC::Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) const {
 	Correct(shares);
 	if (shares.size() == 0) {
 		throw std::invalid_argument("must specify at least one share");
@@ -18,22 +18,19 @@ int FEC::Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) {
 		throw std::invalid_argument("dst buffer must have at least "s + std::to_string(result_len) + " bytes available"s);
 	}
 
-	Rebuild(shares, [&](int num, const uint8_t* begin, const uint8_t* end) {
-		std::copy(begin, end, &dst[num*piece_len]);
+	Rebuild(shares, [&](int num, const Slice<uint8_t>& output) {
+		std::copy(output.begin(), output.end(), &dst[num*piece_len]);
 	});
 
 	return result_len;
 }
 
-void FEC::DecodeTo(
-	std::vector<Share>& shares,
-	const std::function<void(int num, const uint8_t* begin, const uint8_t* end)>& output
-) {
+void FEC::DecodeTo(std::vector<Share>& shares, const ShareOutputFunc& output) const {
 	Correct(shares);
 	Rebuild(shares, output);
 }
 
-void FEC::Correct(std::vector<Share>& shares) {
+void FEC::Correct(std::vector<Share>& shares) const {
 	if (static_cast<int>(shares.size()) < k) {
 		throw std::invalid_argument("must specify at least the number of required shares");
 	}
@@ -51,7 +48,7 @@ void FEC::Correct(std::vector<Share>& shares) {
 		std::fill(buf.begin(), buf.end(), 0);
 
 		for (int j = 0; j < synd.get_c(); j++) {
-			addmul(buf.begin(), buf.end(), shares[j].begin, static_cast<uint8_t>(synd.get(i, j)));
+			addmul(buf.begin(), buf.end(), shares[j].data.begin(), static_cast<uint8_t>(synd.get(i, j)));
 		}
 
 		for (int j = 0; j < buf.size(); j++) {
@@ -60,13 +57,13 @@ void FEC::Correct(std::vector<Share>& shares) {
 			}
 			auto data = berlekampWelch(shares, j);
 			for (auto& share : shares) {
-				share.begin[j] = data[share.num];
+				share.data[j] = data[share.num];
 			}
 		}
 	}
 }
 
-Slice<uint8_t> FEC::berlekampWelch(const std::vector<Share>& shares, int index) {
+Slice<uint8_t> FEC::berlekampWelch(const std::vector<Share>& shares, int index) const {
 	auto r = shares.size(); // required + redundancy size
 	auto e = (r - k) / 2;   // deg of E polynomial
 	auto q = e + k;         // def of Q polynomial
@@ -94,8 +91,7 @@ Slice<uint8_t> FEC::berlekampWelch(const std::vector<Share>& shares, int index) 
 
 	for (unsigned int i = 0; i < dim; i++) {
 		auto x_i = eval_point(shares[i].num);
-		auto r_i = shares[i].begin[index];
-
+		auto r_i = shares[i].data[index];
 		f[i] = x_i.pow(e).mul(r_i);
 
 		for (unsigned int j = 0; j < q; j++) {
@@ -127,10 +123,10 @@ Slice<uint8_t> FEC::berlekampWelch(const std::vector<Share>& shares, int index) 
 	// reverse u for easier construction of the polynomials
 	std::reverse(u.begin(), u.end());
 
-	GFPoly q_poly(u.subspan(e));
+	GFPoly q_poly(u.slice(e));
 	GFPoly e_poly(e+1);
 	e_poly[0] = 1;
-	std::copy(u.begin() + e, u.end(), &e_poly[1]);
+	std::copy(u.begin(), u.begin() + e, &e_poly[1]);
 
 	auto [p_poly, rem] = q_poly.div(e_poly);
 	if (!rem.is_zero()) {
@@ -149,7 +145,7 @@ Slice<uint8_t> FEC::berlekampWelch(const std::vector<Share>& shares, int index) 
 	return out;
 }
 
-GFMat FEC::syndromeMatrix(const std::vector<Share>& shares) {
+GFMat FEC::syndromeMatrix(const std::vector<Share>& shares) const {
 	// get a list of keepers
 	std::vector<bool> keepers(n);
 	int shareCount = 0;

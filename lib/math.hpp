@@ -10,8 +10,8 @@
 
 namespace infectious {
 
-void invertMatrix(Slice<uint8_t> matrix, int k);
-void createInvertedVdm(Slice<uint8_t> vdm, int k);
+void invertMatrix(Slice<uint8_t>& matrix, int k);
+void createInvertedVdm(Slice<uint8_t>& vdm, int k);
 
 } // namespace infectious
 

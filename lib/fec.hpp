@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "addmul.hpp"
+#include "common.hpp"
 #include "gf_alg.hpp"
 #include "math.hpp"
 #include "slice.hpp"
@@ -23,13 +24,14 @@ using namespace std::literals;
 
 struct Share {
 	int num;
-	uint8_t* begin;
-	uint8_t* end;
+	Slice<uint8_t> data;
 
 	int size() const {
-		return end - begin;
+		return data.size();
 	}
 };
+
+using ShareOutputFunc = std::function<void(int num, const Slice<uint8_t> data)>;
 
 // FEC represents operations performed on a Reed-Solomon-based
 // forward error correction code.
@@ -62,10 +64,10 @@ public:
 
 		for (int row = k * k; row < n*k; row += k) {
 			for (int col = 0; col < k; col++) {
-				auto pa = temp_matrix.subspan(row);
-				auto pb = temp_matrix.subspan(col);
+				auto pa = temp_matrix.slice(row);
+				auto pb = temp_matrix.slice(col);
 				uint8_t acc {0};
-				for (int i = 0; i < k; i++, pa = pa.subspan(1), pb = pb.subspan(k)) {
+				for (int i = 0; i < k; i++, pa = pa.slice(1), pb = pb.slice(k)) {
 					acc ^= gf_mul_table[pa[0]][pb[0]];
 				}
 				enc_matrix[row+col] = acc;
@@ -106,11 +108,8 @@ public:
 	//
 	// Note that the byte slices in Shares passed to output may be reused when
 	// output returns.
-	void Encode(
-		const uint8_t* input_begin, const uint8_t* input_end,
-		const std::function<void(int num, const uint8_t* output_begin, const uint8_t* output_end)>& output
-	) const {
-		int size = input_end - input_begin;
+	void Encode(const Slice<uint8_t>& input, const ShareOutputFunc& output) const {
+		int size = input.size();
 
 		if (size < 0 || size % k != 0) {
 			throw std::invalid_argument("input length must be a multiple of k");
@@ -119,7 +118,7 @@ public:
 		int block_size = size / k;
 
 		for (int i = 0; i < k; i++) {
-			output(i, input_begin + (i*block_size), input_begin + (i*block_size+block_size));
+			output(i, input.slice(i*block_size, i*block_size+block_size));
 		}
 
 		Slice<uint8_t> fec_buf(block_size);
@@ -129,12 +128,12 @@ public:
 			for (int j = 0; j < k; j++) {
 				addmul(
 					fec_buf.begin(), fec_buf.end(),
-					input_begin + (j*block_size),
+					&input[j*block_size],
 					enc_matrix[i*k+j]
 				);
 			}
 
-			output(i, fec_buf.begin(), fec_buf.end());
+			output(i, fec_buf);
 		}
 	}
 
@@ -148,10 +147,11 @@ public:
 	//
 	// The num must be 0 <= num < n.
 	void EncodeSingle(
-		const uint8_t* input_begin, const uint8_t* input_end,
+		const Slice<uint8_t>& input,
 		uint8_t* output_begin, uint8_t* output_end,
-		int num) {
-		int size = input_end - input_begin;
+		int num
+	) const {
+		int size = input.size();
 
 		if (num < 0) {
 			throw std::invalid_argument("num must be non-negative");
@@ -173,7 +173,7 @@ public:
 		}
 
 		if (num < k) {
-			std::copy(input_begin + (num*block_size), input_begin + (num*block_size + block_size), output_begin);
+			std::copy(&input[num*block_size], &input[num*block_size + block_size], output_begin);
 			return;
 		}
 
@@ -182,7 +182,7 @@ public:
 		for (int i = 0; i < k; i++) {
 			addmul(
 				output_begin, output_end,
-				input_begin + (i*block_size),
+				&input[i*block_size],
 				enc_matrix[num*k+i]
 			);
 		}
@@ -200,10 +200,7 @@ public:
 	// output returns.
 	//
 	// Rebuild assumes that you have already called Correct or did not need to.
-	void Rebuild(
-		std::vector<Share>& shares,
-		const std::function<void(int num, const uint8_t* begin, const uint8_t* end)>& output
-	) {
+	void Rebuild(std::vector<Share>& shares, const ShareOutputFunc& output) const {
 		if (static_cast<int>(shares.size()) < k) {
 			throw NotEnoughShares();
 		}
@@ -216,16 +213,12 @@ public:
 		Slice<uint8_t> m_dec(k*k);
 		std::vector<int> indexes(k);
 		std::vector<uint8_t*> shares_begins(k);
-		std::vector<uint8_t*> shares_ends(k);
 
 		int shares_b_iter = 0;
 		int shares_e_iter = shares.size() - 1;
 
 		for (int i = 0; i < k; i++) {
 			int share_id;
-			uint8_t* share_data_begin;
-			uint8_t* share_data_end;
-
 			auto share = shares[shares_b_iter];
 			if (share.num == i) {
 				shares_b_iter++;
@@ -234,8 +227,6 @@ public:
 				shares_e_iter--;
 			}
 			share_id = share.num;
-			share_data_begin = share.begin;
-			share_data_end = share.end;
 
 			if (share_id >= n) {
 				throw std::invalid_argument("invalid share id: "s + std::to_string(share_id));
@@ -244,14 +235,13 @@ public:
 			if (share_id < k) {
 				m_dec[i*(k+1)] = 1;
 				if (output) {
-					output(share_id, share_data_begin, share_data_end);
+					output(share_id, share.data);
 				}
 			} else {
 				std::copy(&enc_matrix[share_id*k], &enc_matrix[share_id*k+k], &m_dec[i*k]);
 			}
 
-			shares_begins[i] = share_data_begin;
-			shares_ends[i] = share_data_end;
+			shares_begins[i] = share.data.begin();
 			indexes[i] = share_id;
 		}
 
@@ -267,7 +257,7 @@ public:
 				}
 
 				if (output) {
-					output(i, buf.begin(), buf.end());
+					output(i, buf);
 				}
 			}
 		}
@@ -289,21 +279,18 @@ public:
 	//
 	// If you don't want the data concatenated for you, you can use Correct and
 	// then Rebuild individually.
-	int Decode(Slice<uint8_t>& dst, std::vector<Share>& shares);
+	int Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) const;
 
-	void DecodeTo(
-		std::vector<Share>& shares,
-		const std::function<void(int num, const uint8_t* begin, const uint8_t* end)>& output
-	);
+	void DecodeTo(std::vector<Share>& shares, const ShareOutputFunc& output) const;
 
 	// Correct implements the Berlekamp-Welch algorithm for correcting
 	// errors in given FEC encoded data. It will correct the supplied shares,
 	// mutating the underlying byte slices and reordering the shares
-	void Correct(std::vector<Share>& shares);
+	void Correct(std::vector<Share>& shares) const;
 
 protected:
-	Slice<uint8_t> berlekampWelch(const std::vector<Share>& shares, int index);
-	GFMat syndromeMatrix(const std::vector<Share>& shares);
+	Slice<uint8_t> berlekampWelch(const std::vector<Share>& shares, int index) const;
+	GFMat syndromeMatrix(const std::vector<Share>& shares) const;
 
 protected:
 	int k;

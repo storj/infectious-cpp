@@ -59,7 +59,7 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 
 		indxr[col] = irow;
 		indxc[col] = icol;
-		auto pivot_row = matrix.subspan(icol*k, icol*k+k);
+		auto pivot_row = matrix.slice(icol*k, icol*k+k);
 		auto c = pivot_row[icol];
 
 		if (c == 0) {
@@ -85,7 +85,7 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 					p[icol] = 0;
 					addmul(&p[0], &p[k], pivot_row.begin(), c);
 				}
-				p = p.subspan(k);
+				p = p.slice(k);
 			}
 		}
 

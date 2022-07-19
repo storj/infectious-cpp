@@ -16,11 +16,9 @@ namespace infectious {
 template <typename T>
 std::string hex_string(const T& t) {
 	std::stringstream ss;
-	ss.setf(std::ios_base::hex);
-	ss.width(2);
-	ss.fill('0');
+	ss << std::hex;
 	for (auto v : t) {
-		ss << int(v);
+		ss << std::setfill('0') << std::setw(2) << int(v);
 	}
 	return ss.str();
 }
@@ -120,16 +118,16 @@ public:
 	std::pair<GFPoly, GFPoly> div(GFPoly b) {
 		// sanitize the divisor by removing leading zeros.
 		while (b.size() > 0 && b[0].is_zero()) {
-			b = b.subspan(1);
+			b = b.slice(1);
 		}
 		if (b.size() == 0) {
 			throw std::domain_error("divide by zero");
 		}
 
 		// sanitize the base poly as well
-		auto p = subspan(0);
+		auto p = slice(0);
 		while (p.size() > 0 && p[0].is_zero()) {
-			p = p.subspan(1);
+			p = p.slice(1);
 		}
 		if (p.size() == 0) {
 			return std::make_pair(poly_zero(1), poly_zero(1));
@@ -177,11 +175,11 @@ public:
 			if (!p[0].is_zero()) {
 				throw std::domain_error(std::string("alg error: ") + hex_string(p));
 			}
-			p = p.subspan(1);
+			p = p.slice(1);
 		}
 
 		while (p.size() > 1 && p[0].is_zero()) {
-			p = p.subspan(1);
+			p = p.slice(1);
 		}
 
 		return std::make_pair(q, p);
@@ -205,7 +203,7 @@ public:
 class GFMat {
 public:
 	GFMat(int i, int j)
-		: d {i*j}
+		: d(i*j)
 		, r {i}
 		, c {j}
 	{}
@@ -236,11 +234,11 @@ public:
 	}
 
 	GFVals index_row(int i) {
-		return d.subspan(index(i, 0), index(i+1, 0));
+		return d.slice(index(i, 0), index(i+1, 0));
 	}
 
 	const GFVals index_row(int i) const {
-		return d.subspan(index(i, 0), index(i+1, 0));
+		return d.slice(index(i, 0), index(i+1, 0));
 	}
 
 	void swap_row(int i, int j) {
