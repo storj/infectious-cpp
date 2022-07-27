@@ -23,20 +23,22 @@ namespace infectious {
 using namespace std::literals;
 
 struct Share {
-	int num;
+	int num {0};
 	Slice<uint8_t> data;
-
-	int size() const {
-		return data.size();
-	}
 };
 
 using ShareOutputFunc = std::function<void(int num, const Slice<uint8_t> data)>;
+
+// we go without bounds checking on accesses to the gf_mul_table
+// and its friends.
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 
 // FEC represents operations performed on a Reed-Solomon-based
 // forward error correction code.
 class FEC {
 public:
+	static const int byte_max = 256;
+
 	// This constructor creates a FEC using k required pieces and n total
 	// pieces. Encoding data with this FEC will generate n pieces, and decoding
 	// data requires k uncorrupted pieces. If during decode more than k pieces
@@ -47,7 +49,7 @@ public:
 		, enc_matrix(n*k, 0)
 		, vand_matrix(k*n, 0)
 	{
-		if (k <= 0 || n <= 0 || k > 256 || n > 256 || k > n) {
+		if (k <= 0 || n <= 0 || k > byte_max || n > byte_max || k > n) {
 			throw std::domain_error("requires 1 <= k <= n <= 256");
 		}
 
@@ -55,7 +57,7 @@ public:
 		createInvertedVdm(temp_matrix, k);
 
 		for (int i = k * k; i < temp_matrix.size(); i++) {
-			temp_matrix[i] = gf_exp[((i/k)*(i%k))%255];
+			temp_matrix[i] = gf_exp[((i/k)*(i%k))%(byte_max-1)];
 		}
 
 		for (int i = 0; i < k; i++) {
@@ -90,13 +92,13 @@ public:
 
 	// Required returns the number of required pieces for reconstruction. This
 	// is the k value passed to NewFEC.
-	int Required() const {
+	[[nodiscard]] auto Required() const -> int {
 		return k;
 	}
 
 	// Total returns the number of total pieces that will be generated during
 	// encoding. This is the n value passed to NewFEC.
-	int Total() const {
+	[[nodiscard]] auto Total() const -> int {
 		return n;
 	}
 
@@ -167,7 +169,7 @@ public:
 
 		int block_size = size / k;
 
-		int output_size = output_end - output_begin;
+		int output_size = static_cast<int>(output_end - output_begin);
 		if (output_size != block_size) {
 			throw std::invalid_argument("output length must be equal to "s + std::to_string(block_size));
 		}
@@ -205,7 +207,7 @@ public:
 			throw NotEnoughShares();
 		}
 
-		auto share_size = shares[0].size();
+		auto share_size = shares[0].data.size();
 		std::sort(shares.begin(), shares.end(), [](const Share& a, const Share& b) {
 			return a.num < b.num;
 		});
@@ -215,10 +217,9 @@ public:
 		std::vector<uint8_t*> shares_begins(k);
 
 		int shares_b_iter = 0;
-		int shares_e_iter = shares.size() - 1;
+		int shares_e_iter = static_cast<int>(shares.size()) - 1;
 
 		for (int i = 0; i < k; i++) {
-			int share_id;
 			auto share = shares[shares_b_iter];
 			if (share.num == i) {
 				shares_b_iter++;
@@ -226,7 +227,7 @@ public:
 				share = shares[shares_e_iter];
 				shares_e_iter--;
 			}
-			share_id = share.num;
+			int share_id = share.num;
 
 			if (share_id >= n) {
 				throw std::invalid_argument("invalid share id: "s + std::to_string(share_id));
@@ -248,7 +249,7 @@ public:
 		invertMatrix(m_dec, k);
 
 		Slice<uint8_t> buf(share_size);
-		for (unsigned int i = 0; i < indexes.size(); i++) {
+		for (int i = 0; i < int(indexes.size()); i++) {
 			if (indexes[i] >= k) {
 				std::fill(buf.begin(), buf.end(), 0);
 
@@ -279,7 +280,7 @@ public:
 	//
 	// If you don't want the data concatenated for you, you can use Correct and
 	// then Rebuild individually.
-	int Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) const;
+	auto Decode(Slice<uint8_t>& dst, std::vector<Share>& shares) const -> int;
 
 	void DecodeTo(std::vector<Share>& shares, const ShareOutputFunc& output) const;
 
@@ -289,15 +290,17 @@ public:
 	void Correct(std::vector<Share>& shares) const;
 
 protected:
-	Slice<uint8_t> berlekampWelch(const std::vector<Share>& shares, int index) const;
-	GFMat syndromeMatrix(const std::vector<Share>& shares) const;
+	[[nodiscard]] auto berlekampWelch(const std::vector<Share>& shares, int index) const -> Slice<uint8_t>;
+	[[nodiscard]] auto syndromeMatrix(const std::vector<Share>& shares) const -> GFMat;
 
-protected:
+private:
 	int k;
 	int n;
 	Slice<uint8_t> enc_matrix;
 	Slice<uint8_t> vand_matrix;
 };
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 } // namespace infectious
 

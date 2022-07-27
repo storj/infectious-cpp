@@ -8,24 +8,28 @@
 #include "fec.hpp"
 
 namespace infectious {
+namespace test {
 
-static std::random_device rd;
-static std::mt19937 generator(rd());
+// for some reason, clang-tidy doesn't much care for gtest's macros.
+// NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
+
+std::random_device rd;
+std::mt19937 generator(rd());
 
 struct BerlekampWelchTest : public FEC {
 public:
 	using FEC::FEC;
 
-	std::pair<std::shared_ptr<std::vector<Share>>, ShareOutputFunc> StoreShares() const {
+	[[nodiscard]] auto StoreShares() const -> std::pair<std::shared_ptr<std::vector<Share>>, ShareOutputFunc> {
 		auto out = std::make_shared<std::vector<Share>>(Total());
 
-		return std::make_pair(out, [out](int num, Slice<uint8_t> data) {
+		return std::make_pair(out, [out](int num, const Slice<uint8_t>& data) {
 			(*out)[num].num = num;
 			(*out)[num].data = data.copy();
 		});
 	}
 
-	std::pair<Slice<uint8_t>, std::vector<Share>> SomeShares(int block) const {
+	[[nodiscard]] auto SomeShares(int block) const -> std::pair<Slice<uint8_t>, std::vector<Share>> {
 		// seed the initial data
 		Slice<uint8_t> data(Required() * block);
 
@@ -39,11 +43,11 @@ public:
 		return std::make_pair(data, *shares);
 	}
 
-	Slice<uint8_t> BerlekampWelch(std::vector<Share>& shares, int index) {
+	[[nodiscard]] auto BerlekampWelch(std::vector<Share>& shares, int index) -> Slice<uint8_t> {
 		return berlekampWelch(shares, index);
 	}
 
-	std::vector<Share> CopyShares(const std::vector<Share>& shares) {
+	[[nodiscard]] auto CopyShares(const std::vector<Share>& shares) -> std::vector<Share> {
 		std::vector<Share> out(Total());
 		for (unsigned int i = 0; i < shares.size(); ++i) {
 			out[i].num = shares[i].num;
@@ -52,23 +56,24 @@ public:
 		return out;
 	}
 
-	void MutateShare(int idx, Share share) {
+	static void MutateShare(int idx, Share share) {
+		const int byte_limit = 256;
 		auto orig = share.data[idx];
-		auto next = static_cast<uint8_t>(randn(256));
+		auto next = static_cast<uint8_t>(randn(byte_limit));
 		while (next == orig) {
-			next = static_cast<uint8_t>(randn(256));
+			next = static_cast<uint8_t>(randn(byte_limit));
 		}
 		share.data[idx] = next;
 	}
 
 	void PermuteShares(std::vector<Share>& shares) {
 		for (unsigned int i = 0; i < shares.size(); i++) {
-			auto with = randn(shares.size()-i) + i;
+			auto with = randn(static_cast<int>(shares.size())-i) + i;
 			std::swap(shares[i], shares[with]);
 		}
 	}
 
-	void AssertEqualShares(int required, const std::vector<Share>& expected, const std::vector<Share>& got) {
+	static void AssertEqualShares(int required, const std::vector<Share>& expected, const std::vector<Share>& got) {
 		for (int i = 0; i < required; i++) {
 			ASSERT_EQ(expected[i].num, got[i].num) << "shares[" << i << "].num does not match";
 			ASSERT_EQ(expected[i].data, got[i].data) << "shares[" << i << "].data does not match";
@@ -76,9 +81,9 @@ public:
 	}
 
 	// can be used as a do-nothing output callback
-	static void noop(int, Slice<uint8_t>) {}
+	static void noop(int, const Slice<uint8_t>&) {}
 
-	int randn(int limit) {
+	[[nodiscard]] static auto randn(int limit) -> int {
 		std::uniform_int_distribution<> distrib(0, limit - 1);
 		return distrib(generator);
 	}
@@ -132,12 +137,14 @@ TEST(BerlekampWelch, TestDecode) {
 TEST(BerlekampWelch, TestZero) {
 	const int total = 40;
 	const int required = 20;
+	const int num_zeros = 200;
+	const int num_nonzeros = 20;
 
 	BerlekampWelchTest test(required, total);
 
-	Slice<uint8_t> buf(200);
-	for (int i = 0; i < 20; ++i) {
-		buf.push_back(0x14);
+	Slice<uint8_t> buf(num_zeros);
+	for (int i = 0; i < num_nonzeros; ++i) {
+		buf.push_back(1);
 	}
 
 	auto [shares, callback] = test.StoreShares();
@@ -152,12 +159,13 @@ TEST(BerlekampWelch, TestErrors) {
 	const int block = 4096;
 	const int total = 7;
 	const int required = 3;
+	const int repetitions = 500;
 
 	BerlekampWelchTest test(required, total);
 	auto shares = test.SomeShares(block).second;
 	test.DecodeTo(shares, BerlekampWelchTest::noop);
 
-	for (int i = 0; i < 500; i++) {
+	for (int i = 0; i < repetitions; i++) {
 		auto shares_copy = test.CopyShares(shares);
 		for (int j = 0; j < block; j++) {
 			test.MutateShare(j, shares_copy[test.randn(total)]);
@@ -175,18 +183,19 @@ TEST(BerlekampWelch, RandomShares) {
 	const int block = 4096;
 	const int total = 7;
 	const int required = 3;
+	const int repetitions = 500;
 
 	BerlekampWelchTest test(required, total);
 	auto shares = test.SomeShares(block).second;
 	test.DecodeTo(shares, BerlekampWelchTest::noop);
 
-	for (int i = 0; i < 500; i++) {
+	for (int i = 0; i < repetitions; i++) {
 		auto test_shares = test.CopyShares(shares);
 		test.PermuteShares(test_shares);
 		test_shares.resize(required+2+test.randn(total-required-2));
 
 		for (int i = 0; i < block; i++) {
-			test.MutateShare(i, test_shares[test.randn(test_shares.size())]);
+			test.MutateShare(i, test_shares[test.randn(static_cast<int>(test_shares.size()))]);
 		}
 
 		auto [decoded_shares, callback] = test.StoreShares();
@@ -196,4 +205,7 @@ TEST(BerlekampWelch, RandomShares) {
 	}
 }
 
+// NOLINTEND(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
+
+} // namespace test
 } // namespace infectious

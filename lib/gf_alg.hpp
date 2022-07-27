@@ -4,6 +4,7 @@
 #ifndef INFECTIOUS_GF_ALG_HPP
 #define INFECTIOUS_GF_ALG_HPP
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -14,7 +15,7 @@
 namespace infectious {
 
 template <typename T>
-std::string hex_string(const T& t) {
+[[nodiscard]] auto hex_string(const T& t) -> std::string {
 	std::stringstream ss;
 	ss << std::hex;
 	for (auto v : t) {
@@ -31,7 +32,7 @@ class GFVals : public SliceSubclass<GFVal, GFVals> {
 public:
 	using SliceSubclass<GFVal, GFVals>::SliceSubclass;
 
-	GFVal dot(const GFVals& b) const {
+	[[nodiscard]] auto dot(const GFVals& b) const -> GFVal {
 		GFVal out = 0;
 		for (int i = 0; i < size(); i++) {
 			out = out.add((*this)[i].mul(b[i]));
@@ -48,28 +49,25 @@ class GFPoly : public SliceSubclass<GFVal, GFPoly> {
 public:
 	using SliceSubclass<GFVal, GFPoly>::SliceSubclass;
 
-	GFPoly(const GFVals& gfv)
+	explicit GFPoly(const GFVals& gfv)
 		: GFPoly(static_cast<const GFPoly&>(static_cast<const Slice&>(gfv)))
 	{}
 
-	static GFPoly poly_zero(int size) {
-		return GFPoly(size, 0);
+	[[nodiscard]] static auto poly_zero(int size) -> GFPoly {
+		return {size, 0};
 	}
 
-	bool is_zero() const {
-		for (auto coef : *this) {
-			if (!coef.is_zero()) {
-				return false;
-			}
-		}
-		return true;
+	[[nodiscard]] auto is_zero() const -> bool {
+		return std::all_of(begin(), end(), [](GFVal g) -> bool {
+			return g.is_zero();
+		});
 	}
 
-	int deg() const {
+	[[nodiscard]] auto deg() const -> int {
 		return size() - 1;
 	}
 
-	GFVal index(int power) const {
+	[[nodiscard]] auto index(int power) const -> GFVal {
 		if (power < 0) {
 			return 0;
 		}
@@ -80,7 +78,7 @@ public:
 		return (*this)[which];
 	}
 
-	GFPoly scale(GFVal factor) const {
+	[[nodiscard]] auto scale(GFVal factor) const -> GFPoly {
 		GFPoly out(size(), 0);
 		for (int i = 0; i < size(); i++) {
 			out[i] = (*this)[i].mul(factor);
@@ -93,13 +91,13 @@ public:
 		if (which < 0) {
 			GFPoly tmp = std::move(*this);
 			*this = GFPoly(-which, 0);
-			vals->insert(vals->end(), tmp.begin(), tmp.end());
+			extend(tmp);
 			which = deg() - pow;
 		}
 		(*this)[which] = coef;
 	}
 
-	GFPoly add(GFPoly b) const {
+	[[nodiscard]] auto add(const GFPoly& b) const -> GFPoly {
 		auto len = size();
 		if (b.size() > len) {
 			len = b.size();
@@ -115,7 +113,7 @@ public:
 
 	// Accepts b, *this is p; returns q, r.
 	// Throws std::domain_error on divide by zero.
-	std::pair<GFPoly, GFPoly> div(GFPoly b) {
+	[[nodiscard]] auto div(GFPoly b) const -> std::pair<GFPoly, GFPoly> {
 		// sanitize the divisor by removing leading zeros.
 		while (b.size() > 0 && b[0].is_zero()) {
 			b = b.slice(1);
@@ -136,8 +134,10 @@ public:
 		const bool debug = false;
 		int indent = 2*b.size() + 1;
 
-		if (debug) {
+		if constexpr (debug) {
 			std::cerr << hex_string(b) << ' ' << hex_string(p) << '\n';
+		} else {
+			(void) indent; // indent is used.
 		}
 
 		GFPoly q;
@@ -145,7 +145,7 @@ public:
 			auto leading_p = p.index(p.deg());
 			auto leading_b = b.index(b.deg());
 
-			if (debug) {
+			if constexpr (debug) {
 				std::cerr
 					<< std::setw(2) << std::setfill('0') << std::hex
 					<< "leading_p: "
@@ -156,7 +156,7 @@ public:
 			}
 
 			auto coef = leading_p.div(leading_b);
-			if (debug) {
+			if constexpr (debug) {
 				std::cerr << std::setw(2) << std::setfill('0') << std::hex << "coef: " << static_cast<int>(coef) << '\n';
 			}
 
@@ -166,7 +166,7 @@ public:
 			auto append_zero = poly_zero(p.deg() - padded.deg());
 			std::copy(append_zero.begin(), append_zero.end(), std::back_inserter(padded));
 
-			if (debug) {
+			if constexpr (debug) {
 				std::cerr << std::setw(indent) << "" << std::setw(0) << hex_string(padded) << '\n';
 				indent += 2;
 			}
@@ -185,7 +185,7 @@ public:
 		return std::make_pair(q, p);
 	}
 
-	GFVal eval(GFVal x) {
+	[[nodiscard]] auto eval(GFVal x) const -> GFVal {
 		GFVal out {0};
 		for (int i = 0; i <= deg(); i++) {
 			auto x_i = x.pow(i);
@@ -208,7 +208,7 @@ public:
 		, c {j}
 	{}
 
-	std::string to_string() const {
+	[[nodiscard]] auto to_string() const -> std::string {
 		if (r == 0) {
 			return "";
 		}
@@ -221,11 +221,11 @@ public:
 		return ss.str();
 	}
 
-	int index(int i, int j) const {
+	[[nodiscard]] auto index(int i, int j) const -> int {
 		return c * i + j;
 	}
 
-	GFVal get(int i, int j) const {
+	[[nodiscard]] auto get(int i, int j) const -> GFVal {
 		return d[index(i, j)];
 	}
 
@@ -233,15 +233,11 @@ public:
 		d[index(i, j)] = val;
 	}
 
-	GFVals index_row(int i) {
+	[[nodiscard]] auto index_row(int i) const -> GFVals {
 		return d.slice(index(i, 0), index(i+1, 0));
 	}
 
-	const GFVals index_row(int i) const {
-		return d.slice(index(i, 0), index(i+1, 0));
-	}
-
-	void swap_row(int i, int j) {
+	void swap_row(int i, int j) const {
 		GFVals tmp(r, 0);
 		auto ri = index_row(i);
 		auto rj = index_row(j);
@@ -250,14 +246,16 @@ public:
 		std::copy(tmp.begin(), tmp.end(), rj.begin());
 	}
 
-	void scale_row(int i, GFVal val) {
+	void scale_row(int i, GFVal val) const {
 		auto ri = index_row(i);
 		for (auto& i : ri) {
 			i = i.mul(val);
 		}
 	}
 
-	void addmul_row(int i, int j, GFVal val) {
+	// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+
+	void addmul_row(int i, int j, GFVal val) const {
 		auto ri = index_row(i);
 		auto rj = index_row(j);
 		addmul(
@@ -265,6 +263,8 @@ public:
 			reinterpret_cast<const uint8_t*>(ri.begin()), uint8_t(val)
 		);
 	}
+
+	// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
 	// in place invert. the output is put into a and *this is turned into the
 	// identity matrix. a is expected to be the identity matrix.
@@ -341,7 +341,7 @@ public:
 
 	// parity returns the new matrix because it changes dimensions and stuff. it
 	// can be done in place, but is easier to implement with a copy.
-	GFMat parity() const {
+	[[nodiscard]] auto parity() const -> GFMat {
 		// we assume *this is in standard form already
 		// it is of form [I_r | P]
 		// our output will be [-P_transpose | I_(c - r)]
@@ -371,15 +371,15 @@ public:
 		return out;
 	}
 
-	int get_r() const {
+	[[nodiscard]] auto get_r() const -> int {
 		return r;
 	}
 
-	int get_c() const {
+	[[nodiscard]] auto get_c() const -> int {
 		return c;
 	}
 
-protected:
+private:
 	GFVals d;
 	int r;
 	int c;

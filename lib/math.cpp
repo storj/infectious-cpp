@@ -15,7 +15,7 @@ struct pivotSearcher {
 		, ipiv(k)
 	{}
 
-	std::pair<int, int> search(int col, const Slice<uint8_t>& matrix) {
+	auto search(int col, const Slice<uint8_t>& matrix) -> std::pair<int, int> {
 		if (!ipiv[col] && matrix[col*k+col] != 0) {
 			ipiv[col] = true;
 			return std::make_pair(col, col);
@@ -37,11 +37,18 @@ struct pivotSearcher {
 		throw std::invalid_argument("pivot not found");
 	}
 
+private:
 	int k;
 	std::vector<bool> ipiv;
 };
 
+// we go without bounds checking on accesses to the gf_mul_table
+// and its friends.
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+
 // TODO(jeff): matrix is a K*K array, row major.
+//
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 void invertMatrix(Slice<uint8_t>& matrix, int k) {
 	pivotSearcher pivot_searcher(k);
 	std::vector<int> indxc(k);
@@ -100,6 +107,7 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 		}
 	}
 }
+// NOLINTEND(readability-function-cognitive-complexity)
 
 void createInvertedVdm(Slice<uint8_t>& vdm, int k) {
 	if (k == 1) {
@@ -112,7 +120,7 @@ void createInvertedVdm(Slice<uint8_t>& vdm, int k) {
 
 	c[k-1] = 0;
 	for (int i = 1; i < k; i++) {
-		auto& mul_p_i = gf_mul_table[gf_exp[i]];
+		const auto& mul_p_i = gf_mul_table[gf_exp[i]];
 		for (int j = k - 1 - (i - 1); j < k-1; j++) {
 			c[j] ^= mul_p_i[c[j+1]];
 		}
@@ -124,7 +132,7 @@ void createInvertedVdm(Slice<uint8_t>& vdm, int k) {
 		if (row != 0) {
 			index = static_cast<int>(gf_exp[row]);
 		}
-		auto& mul_p_row = gf_mul_table[index];
+		const auto& mul_p_row = gf_mul_table[index];
 
 		uint8_t t = 1;
 		b[k-1] = 1;
@@ -133,11 +141,13 @@ void createInvertedVdm(Slice<uint8_t>& vdm, int k) {
 			t = b[i] ^ mul_p_row[t];
 		}
 
-		auto& mul_t_inv = gf_mul_table[gf_inverse[t]];
+		const auto& mul_t_inv = gf_mul_table[gf_inverse[t]];
 		for (int col = 0; col < k; col++) {
 			vdm[col*k+row] = mul_t_inv[b[col]];
 		}
 	}
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 } // namespace infectious

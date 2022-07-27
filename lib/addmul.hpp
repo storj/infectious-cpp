@@ -10,7 +10,7 @@
 namespace infectious {
 
 void addmul(
-	uint8_t* z_begin, uint8_t* z_end,
+	uint8_t* z_begin, const uint8_t* z_end,
 	const uint8_t* x, uint8_t y
 );
 

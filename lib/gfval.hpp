@@ -26,57 +26,68 @@ public:
 
 	GFVal(const GFVal&) = default;
 	GFVal(GFVal&&) = default;
-	GFVal& operator=(const GFVal&) = default;
-	GFVal& operator=(GFVal&&) = default;
+	~GFVal() = default;
+	auto operator=(const GFVal&) -> GFVal& = default;
+	auto operator=(GFVal&&) -> GFVal& = default;
 
-	operator uint8_t() const {
+	operator uint8_t() const noexcept {
 		return n;
 	}
 
-	GFVal& operator^=(int x) {
+	auto operator^=(int x) noexcept -> GFVal& {
 		n ^= x;
 		return *this;
 	}
 
-	GFVal pow(int val) const {
+	// we go without bounds checking on accesses to the gf_mul_table
+	// and its friends.
+	// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+
+	[[nodiscard]] auto pow(int val) const -> GFVal {
 		GFVal out = 1;
-		auto& mul_base = gf_mul_table[n];
+		const auto& mul_base = gf_mul_table[n];
 		for (int i = 0; i < val; i++) {
 			out = mul_base[out.n];
 		}
 		return out;
 	}
 
-	GFVal mul(GFVal b) const {
-		return GFVal(gf_mul_table[n][b.n]);
+	[[nodiscard]] auto mul(GFVal b) const -> GFVal {
+		return {gf_mul_table[n][b.n]};
 	}
 
-	GFVal div(GFVal b) const {
+	[[nodiscard]] auto div(GFVal b) const -> GFVal {
 		if (b == 0) {
 			throw std::domain_error("divide by zero");
 		}
 		if (n == 0) {
 			return 0;
 		}
-		return GFVal(gf_exp[gf_log[n]-gf_log[b.n]]);
+		return {gf_exp[gf_log[n]-gf_log[b.n]]};
 	}
 
-	GFVal add(GFVal b) const noexcept {
-		return GFVal(n ^ b.n);
+	// clang-tidy means well, but it's ok to pass b by value, it's one byte
+	// NOLINTNEXTLINE(performance-unnecessary-value-param)
+	[[nodiscard]] auto add(GFVal b) const noexcept -> GFVal {
+		return {static_cast<uint8_t>(n ^ b.n)};
 	}
 
-	bool is_zero() const noexcept {
+	[[nodiscard]] auto is_zero() const noexcept -> bool {
 		return n == 0;
 	}
 
-	GFVal inv() const {
+	const static int top_of_range = (1<<8) - 1;
+
+	[[nodiscard]] auto inv() const -> GFVal {
 		if (n == 0) {
 			throw std::domain_error("invert zero");
 		}
-		return GFVal(gf_exp[255-gf_log[n]]);
+		return {gf_exp[top_of_range-gf_log[n]]};
 	}
 
-protected:
+	// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+
+private:
 	uint8_t n;
 };
 

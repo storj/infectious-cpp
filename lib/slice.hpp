@@ -24,7 +24,11 @@ protected:
 	{}
 
 public:
-	Slice() : Slice(0, 0) {}
+	Slice()
+		: vals {std::make_shared<std::vector<T>>(0)}
+		, start_index {0}
+		, end_index {0}
+	{}
 
 	explicit Slice(int num_elements)
 		: vals {std::make_shared<std::vector<T>>(num_elements)}
@@ -38,56 +42,64 @@ public:
 		, end_index {num_elements}
 	{}
 
-	Slice(std::initializer_list<T> init)
+	explicit Slice(std::vector<T> init)
 		: vals {std::make_shared<std::vector<T>>(std::move(init))}
 		, start_index {0}
 		, end_index {static_cast<int>(vals->size())}
 	{}
 
+	template <std::input_iterator IterType>
+	Slice(IterType&& ibegin, IterType&& iend)
+		: vals {std::make_shared<std::vector<T>>(std::forward<IterType>(ibegin), std::forward<IterType>(iend))}
+		, start_index {0}
+		, end_index {static_cast<int>(iend - ibegin)}
+	{}
+
 	Slice(const Slice<T>&) = default;
-	Slice(Slice<T>&&) = default;
-	Slice<T>& operator=(const Slice<T>&) = default;
-	Slice<T>& operator=(Slice<T>&&) = default;
+	Slice(Slice<T>&&) noexcept = default;
+	~Slice() = default;
+	auto operator=(const Slice<T>&) -> Slice<T>& = default;
+	auto operator=(Slice<T>&&) noexcept -> Slice<T>& = default;
 
 	using value_type = T;
 
-	int size() const {
+	[[nodiscard]] auto size() const -> int {
 		return end_index - start_index;
 	}
 
-	T& operator[](int n) {
+	[[nodiscard]] auto operator[](int n) -> T& {
 		return vals->operator[](n + start_index);
 	}
 
-	const T& operator[](int n) const {
+	[[nodiscard]] auto operator[](int n) const -> const T& {
 		return vals->operator[](n + start_index);
 	}
 
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	iterator begin() {
-		return vals->data() + start_index;
+	[[nodiscard]] auto begin() -> iterator {
+		return &(vals->data())[start_index];
 	}
 
-	iterator end() {
-		return vals->data() + end_index;
+	[[nodiscard]] auto end() -> iterator {
+		return &(vals->data())[end_index];
 	}
 
-	const_iterator begin() const {
-		return vals->data() + start_index;
+	[[nodiscard]] auto begin() const -> const_iterator {
+		return &(vals->data())[start_index];
 	}
 
-	const_iterator end() const {
-		return vals->data() + end_index;
+	[[nodiscard]] auto end() const -> const_iterator {
+		return &(vals->data())[end_index];
 	}
 
-	const_iterator cbegin() const {
-		return vals->data() + start_index;
+	[[nodiscard]] auto cbegin() const -> const_iterator {
+		return &(vals->data())[start_index];
 	}
 
-	const_iterator cend() const {
-		return vals->data() + end_index;
+	[[nodiscard]] auto cend() const -> const_iterator {
+		return &(vals->data())[end_index];
 	}
 
 	void push_back(T val) {
@@ -99,14 +111,19 @@ public:
 		end_index++;
 	}
 
-	Slice slice(int start_at) {
+	template <typename Range>
+	void extend(const Range& r) {
+		vals->insert(vals->end(), r.begin(), r.end());
+	}
+
+	[[nodiscard]] auto slice(int start_at) const -> Slice {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		return Slice<T>(vals, start_index + start_at, end_index);
 	}
 
-	Slice slice(int start_at, int end_at) {
+	[[nodiscard]] auto slice(int start_at, int end_at) const -> Slice {
 		if (start_at < 0 || start_at > size()) {
 			throw std::out_of_range("start_at out of range");
 		}
@@ -116,24 +133,7 @@ public:
 		return Slice<T>(vals, start_index + start_at, start_index + end_at);
 	}
 
-	const Slice slice(int start_at) const {
-		if (start_at < 0 || start_at > size()) {
-			throw std::out_of_range("start_at out of range");
-		}
-		return Slice<T>(vals, start_index + start_at, end_index);
-	}
-
-	const Slice slice(int start_at, int end_at) const {
-		if (start_at < 0 || start_at > size()) {
-			throw std::out_of_range("start_at out of range");
-		}
-		if (end_at < start_at || end_at > size()) {
-			throw std::out_of_range("end_at out of range");
-		}
-		return Slice<T>(vals, start_index + start_at, start_index + end_at);
-	}
-
-	bool operator==(const Slice<T>& other) const {
+	[[nodiscard]] auto operator==(const Slice<T>& other) const -> bool {
 		if (size() != other.size()) {
 			return false;
 		}
@@ -145,7 +145,7 @@ public:
 		return true;
 	}
 
-	int operator<=>(const Slice<T>& other) const {
+	[[nodiscard]] auto operator<=>(const Slice<T>& other) const -> int {
 		for (int i = 0; i < size(); ++i) {
 			if (i >= other.size()) {
 				return 1;
@@ -163,12 +163,24 @@ public:
 		return 0;
 	}
 
-	Slice<T> copy() const {
+	[[nodiscard]] auto copy() const -> Slice<T> {
 		auto new_vec = std::make_shared<std::vector<T>>(begin(), end());
 		return Slice(std::move(new_vec), 0, size());
 	}
 
-protected:
+	[[nodiscard]] auto backing_vector() const -> std::shared_ptr<std::vector<T>> {
+		return vals;
+	}
+
+	[[nodiscard]] auto get_start_index() const -> int {
+		return start_index;
+	}
+
+	[[nodiscard]] auto get_end_index() const -> int {
+		return end_index;
+	}
+
+private:
 	std::shared_ptr<std::vector<T>> vals;
 	int start_index;
 	int end_index;
@@ -181,50 +193,38 @@ public:
 	using ThisClass = SliceSubclass<T, Subclass>;
 
 	SliceSubclass(const ThisClass&) = default;
-	SliceSubclass(ThisClass&&) = default;
-	ThisClass& operator=(const ThisClass&) = default;
-	ThisClass& operator=(ThisClass&&) = default;
+	SliceSubclass(ThisClass&&) noexcept = default;
+	~SliceSubclass() = default;
+	auto operator=(const ThisClass&) -> ThisClass& = default;
+	auto operator=(ThisClass&&) noexcept -> ThisClass& = default;
 
-	Subclass& operator=(const Subclass& t) {
+	// This is kind of a weird use of the CRTP; not surprised clang-tidy doesn't like it.
+	// NOLINTNEXTLINE(cppcoreguidelines-c-copy-assignment-signature,misc-unconventional-assign-operator)
+	auto operator=(const Subclass& t) -> Subclass& {
 		return static_cast<Subclass&>(operator=(static_cast<const Slice<T>&>(t)));
 	}
 
-	Subclass& operator=(Subclass&& t) {
+	// This is kind of a weird use of the CRTP; not surprised clang-tidy doesn't like it.
+	// NOLINTNEXTLINE(cppcoreguidelines-c-copy-assignment-signature,misc-unconventional-assign-operator)
+	auto operator=(Subclass&& t) -> Subclass& {
 		return static_cast<Subclass&>(operator=(static_cast<Slice<T>&&>(t)));
 	}
 
-	Subclass slice(int start_at) {
+	[[nodiscard]] auto slice(int start_at) const -> Subclass {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}
-		return Subclass(this->vals, this->start_index + start_at, this->end_index);
+		return Subclass(this->backing_vector(), this->get_start_index() + start_at, this->get_end_index());
 	}
 
-	Subclass slice(int start_at, int end_at) {
+	[[nodiscard]] auto slice(int start_at, int end_at) const -> Subclass {
 		if (start_at < 0 || start_at > this->size()) {
 			throw std::out_of_range("start_at out of range");
 		}
 		if (end_at < start_at || end_at > this->size()) {
 			throw std::out_of_range("end_at out of range");
 		}
-		return Subclass(this->vals, this->start_index + start_at, this->start_index + end_at);
-	}
-
-	const Subclass slice(int start_at) const {
-		if (start_at < 0 || start_at > this->size()) {
-			throw std::out_of_range("start_at out of range");
-		}
-		return Subclass(this->vals, this->start_index + start_at, this->end_index);
-	}
-
-	const Subclass slice(int start_at, int end_at) const {
-		if (start_at < 0 || start_at > this->size()) {
-			throw std::out_of_range("start_at out of range");
-		}
-		if (end_at < start_at || end_at > this->size()) {
-			throw std::out_of_range("end_at out of range");
-		}
-		return Subclass(this->vals, this->start_index + start_at, this->start_index + end_at);
+		return Subclass(this->backing_vector(), this->get_start_index() + start_at, this->get_start_index() + end_at);
 	}
 };
 

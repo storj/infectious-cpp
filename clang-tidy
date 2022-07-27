@@ -1,0 +1,3 @@
+# todo- work this properly into SConscript
+
+/usr/local/Cellar/llvm/*/bin/clang-tidy -checks='-*,bugprone-*,cert-*,clang-analyzer-*,concurrency-*,cppcoreguidelines-*,misc-*,modernize-*,performance-*,portability-*,readability-*,-readability-identifier-length,-bugprone-easily-swappable-parameters,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-misc-non-private-member-variables-in-classes,-readability-static-accessed-through-instance,-readability-named-parameter' -header-filter='lib/.*' lib/*.cpp -- -std=c++20 -I/usr/local/Cellar/googletest/1.12.1/include
