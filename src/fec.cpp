@@ -1,13 +1,57 @@
-// Copyright (C) 2022 Storj Labs, Inc.
-// See LICENSE for copying information.
-
-#include <utility>
-
-#include "addmul.hpp"
-#include "math.hpp"
+#include <algorithm>
+#include <cstring>
+#include <stdexcept>
+#include <vector>
+#include "infectious/fec.hpp"
 #include "tables.hpp"
 
 namespace infectious {
+
+// we go without bounds checking on accesses to the gf_mul_table
+// and its friends.
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+
+void FEC::initialize() {
+	if (k <= 0 || n <= 0 || k > byte_max || n > byte_max || k > n) {
+		throw std::domain_error("requires 1 <= k <= n <= 256");
+	}
+
+	std::vector<uint8_t> temp_matrix(n*k, 0);
+	createInvertedVdm(temp_matrix, k);
+
+	for (int i = k * k; i < n*k; i++) {
+		temp_matrix[i] = gf_exp[((i/k)*(i%k))%(byte_max-1)];
+	}
+
+	for (int i = 0; i < k; i++) {
+		enc_matrix[i*(k+1)] = 1;
+	}
+
+	for (int row = k * k; row < n*k; row += k) {
+		for (int col = 0; col < k; ++col) {
+			uint8_t acc {0};
+			for (int i = 0; i < k; ++i) {
+				const uint8_t row_v = temp_matrix[row + i];
+				const uint8_t row_c = temp_matrix[col + k * i];
+				acc ^= gf_mul_table[row_v][row_c];
+			}
+			enc_matrix[row+col] = acc;
+		}
+	}
+
+	// vand_matrix has more columns than rows
+	// k rows, n columns.
+	vand_matrix[0] = 1;
+	uint8_t g {1};
+	for (int row = 0; row < k; row++) {
+		uint8_t a {1};
+		for (int col = 1; col < n; col++) {
+			vand_matrix[row*n+col] = a; // 2.pow(i * j) FIGURE IT OUT
+			a = gf_mul_table[g][a];
+		}
+		g = gf_mul_table[2][g];
+	}
+}
 
 struct pivotSearcher {
 	pivotSearcher(int k_)
@@ -15,7 +59,7 @@ struct pivotSearcher {
 		, ipiv(k)
 	{}
 
-	auto search(int col, const Slice<uint8_t>& matrix) -> std::pair<int, int> {
+	auto search(int col, const std::vector<uint8_t>& matrix) -> std::pair<int, int> {
 		if (!ipiv[col] && matrix[col*k+col] != 0) {
 			ipiv[col] = true;
 			return std::make_pair(col, col);
@@ -42,18 +86,14 @@ private:
 	std::vector<bool> ipiv;
 };
 
-// we go without bounds checking on accesses to the gf_mul_table
-// and its friends.
-// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
-
 // TODO(jeff): matrix is a K*K array, row major.
 //
 // NOLINTBEGIN(readability-function-cognitive-complexity)
-void invertMatrix(Slice<uint8_t>& matrix, int k) {
+void FEC::invertMatrix(std::vector<uint8_t>& matrix, int k) {
 	pivotSearcher pivot_searcher(k);
 	std::vector<int> indxc(k);
 	std::vector<int> indxr(k);
-	Slice<uint8_t> id_row(k);
+	std::vector<uint8_t> id_row(k);
 
 	for (int col = 0; col < k; col++) {
 		auto [icol, irow] = pivot_searcher.search(col, matrix);
@@ -66,7 +106,7 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 
 		indxr[col] = irow;
 		indxc[col] = icol;
-		auto pivot_row = matrix.slice(icol*k, icol*k+k);
+		auto pivot_row = &matrix[icol*k];
 		auto c = pivot_row[icol];
 
 		if (c == 0) {
@@ -84,15 +124,15 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 		}
 
 		id_row[icol] = 1;
-		if (memcmp(pivot_row.begin(), id_row.begin(), pivot_row.size()) != 0) {
-			auto p = matrix;
+		if (std::memcmp(pivot_row, id_row.data(), k) != 0) {
+			auto p = matrix.data();
 			for (int i = 0; i < k; i++) {
 				if (i != icol) {
 					c = p[icol];
 					p[icol] = 0;
-					addmul(&p[0], &p[k], pivot_row.begin(), c);
+					addmul(&p[0], &p[k], pivot_row, c);
 				}
-				p = p.slice(k);
+				p = p + k;
 			}
 		}
 
@@ -109,14 +149,14 @@ void invertMatrix(Slice<uint8_t>& matrix, int k) {
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 
-void createInvertedVdm(Slice<uint8_t>& vdm, int k) {
+void FEC::createInvertedVdm(std::vector<uint8_t>& vdm, int k) {
 	if (k == 1) {
 		vdm[0] = 1;
 		return;
 	}
 
-	Slice<uint8_t> b(k);
-	Slice<uint8_t> c(k);
+	std::vector<uint8_t> b(k);
+	std::vector<uint8_t> c(k);
 
 	c[k-1] = 0;
 	for (int i = 1; i < k; i++) {

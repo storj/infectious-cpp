@@ -8,8 +8,7 @@
 
 #include <x86intrin.h>
 
-#include "addmul.hpp"
-#include "slice.hpp"
+#include "infectious/fec.hpp"
 #include "tables.hpp"
 
 namespace infectious {
@@ -18,14 +17,14 @@ namespace infectious {
 // and its friends.
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 
-void addmul(
+void FEC::addmul(
 	uint8_t* z_begin, const uint8_t* z_end,
 	const uint8_t* x, uint8_t y
 ) {
 	auto z_size = static_cast<int>(z_end - z_begin);
 	const auto& gf_mul_y = gf_mul_table[y];
 	for (int i = 0; i < z_size; i++) {
-		z_begin[i] ^= GFVal(gf_mul_y[x[i]]);
+		z_begin[i] ^= gf_mul_y[x[i]];
 	}
 }
 
