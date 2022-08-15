@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
-#include "fec.hpp"
+#include "infectious/fec.hpp"
+#include "../src/gf_alg.hpp"
 
 namespace infectious {
 namespace test {

@@ -5,7 +5,7 @@
 #include <vector>
 #include "gtest/gtest.h"
 
-#include "fec.hpp"
+#include "infectious/fec.hpp"
 
 namespace infectious {
 namespace test {
@@ -20,20 +20,20 @@ struct BerlekampWelchTest : public FEC {
 public:
 	using FEC::FEC;
 
-	[[nodiscard]] auto StoreShares() const -> std::pair<std::shared_ptr<std::vector<Share>>, ShareOutputFunc> {
-		auto out = std::make_shared<std::vector<Share>>(Total());
+	[[nodiscard]] auto StoreShares() const -> std::pair<std::shared_ptr<std::map<int, std::vector<uint8_t>>>, ShareOutputFunc> {
+		auto out = std::make_shared<std::map<int, std::vector<uint8_t>>>();
 
-		return std::make_pair(out, [out](int num, const Slice<uint8_t>& data) {
-			(*out)[num].num = num;
-			(*out)[num].data = data.copy();
+		return std::make_pair(out, [out](int num, ByteView output) {
+			(*out)[num].resize(output.size());
+			std::copy(output.begin(), output.end(), (*out)[num].begin());
 		});
 	}
 
-	[[nodiscard]] auto SomeShares(int block) const -> std::pair<Slice<uint8_t>, std::vector<Share>> {
+	[[nodiscard]] auto SomeShares(int block) const -> std::pair<std::vector<uint8_t>, std::map<int, std::vector<uint8_t>>> {
 		// seed the initial data
-		Slice<uint8_t> data(Required() * block);
+		std::vector<uint8_t> data(Required() * block);
 
-		for (int i = 0; i < data.size(); ++i) {
+		for (int i = 0; i < static_cast<int>(data.size()); ++i) {
 			data[i] = static_cast<uint8_t>(i+1);
 		}
 
@@ -43,45 +43,46 @@ public:
 		return std::make_pair(data, *shares);
 	}
 
-	[[nodiscard]] auto BerlekampWelch(std::vector<Share>& shares, int index) -> Slice<uint8_t> {
-		return berlekampWelch(shares, index);
+	[[nodiscard]] auto BerlekampWelch(const std::vector<uint8_t*>& shares, const std::vector<int>& shares_nums, int index) -> std::vector<uint8_t> {
+		return berlekampWelch(shares, shares_nums, index);
 	}
 
-	[[nodiscard]] auto CopyShares(const std::vector<Share>& shares) -> std::vector<Share> {
-		std::vector<Share> out(Total());
-		for (unsigned int i = 0; i < shares.size(); ++i) {
-			out[i].num = shares[i].num;
-			out[i].data = shares[i].data.copy();
-		}
-		return out;
+	[[nodiscard]] auto CopyShares(const std::map<int, std::vector<uint8_t>>& shares) -> std::map<int, std::vector<uint8_t>> {
+		return shares;
 	}
 
-	static void MutateShare(int idx, Share share) {
+	static void MutateShare(int idx, std::pair<int, std::vector<uint8_t>>& share) {
 		const int byte_limit = 256;
-		auto orig = share.data[idx];
+		auto orig = share.second[idx];
 		auto next = static_cast<uint8_t>(randn(byte_limit));
 		while (next == orig) {
 			next = static_cast<uint8_t>(randn(byte_limit));
 		}
-		share.data[idx] = next;
+		share.second[idx] = next;
 	}
 
-	void PermuteShares(std::vector<Share>& shares) {
+	void PermuteShares(std::vector<std::pair<int, std::vector<uint8_t>>>& shares) {
 		for (unsigned int i = 0; i < shares.size(); i++) {
 			auto with = randn(static_cast<int>(shares.size())-i) + i;
 			std::swap(shares[i], shares[with]);
 		}
 	}
 
-	static void AssertEqualShares(int required, const std::vector<Share>& expected, const std::vector<Share>& got) {
-		for (int i = 0; i < required; i++) {
-			ASSERT_EQ(expected[i].num, got[i].num) << "shares[" << i << "].num does not match";
-			ASSERT_EQ(expected[i].data, got[i].data) << "shares[" << i << "].data does not match";
-		}
+	std::map<int, std::vector<uint8_t>> as_map(std::vector<std::pair<int, std::vector<uint8_t>>>& m) {
+		return std::map(m.begin(), m.end());
+	}
+
+	std::map<int, std::vector<uint8_t>> as_map(std::map<int, std::vector<uint8_t>>& m) {
+		return m;
+	}
+
+	template <typename T1, typename T2>
+	void AssertEqualShares(T1& expected, T2& got) {
+		ASSERT_EQ(as_map(expected), as_map(got));
 	}
 
 	// can be used as a do-nothing output callback
-	static void noop(int, const Slice<uint8_t>&) {}
+	static void noop(int, ByteView) {}
 
 	[[nodiscard]] static auto randn(int limit) -> int {
 		std::uniform_int_distribution<> distrib(0, limit - 1);
@@ -97,8 +98,16 @@ TEST(BerlekampWelch, SingleBlock) {
 	BerlekampWelchTest test(required, total);
 	auto shares = test.SomeShares(block).second;
 
-	auto out = test.BerlekampWelch(shares, 0);
-	ASSERT_EQ(out, Slice<uint8_t>({0x01, 0x02, 0x03, 0x15, 0x69, 0xcc, 0xf2}));
+	std::vector<uint8_t*> shares_data;
+	std::vector<int> shares_nums;
+	for (int i = 0; i < static_cast<int>(shares.size()); ++i) {
+		if (!shares[i].empty()) {
+			shares_data.push_back(shares[i].data());
+			shares_nums.push_back(i);
+		}
+	}
+	auto out = test.BerlekampWelch(shares_data, shares_nums, 0);
+	ASSERT_EQ(out, (std::vector<uint8_t>{0x01, 0x02, 0x03, 0x15, 0x69, 0xcc, 0xf2}));
 }
 
 TEST(BerlekampWelch, MultipleBlock) {
@@ -111,13 +120,16 @@ TEST(BerlekampWelch, MultipleBlock) {
 
 	test.DecodeTo(shares, BerlekampWelchTest::noop);
 
-	shares[0].data[0]++;
-	shares[1].data[0]++;
+	shares[0][0]++;
+	shares[1][0]++;
 
 	auto [decoded_shares, callback] = test.StoreShares();
 	test.DecodeTo(shares, callback);
 
-	test.AssertEqualShares(required, shares, *decoded_shares);
+	for (int i = required; i < total; ++i) {
+		shares.erase(i);
+	}
+	test.AssertEqualShares(shares, *decoded_shares);
 }
 
 TEST(BerlekampWelch, TestDecode) {
@@ -128,9 +140,9 @@ TEST(BerlekampWelch, TestDecode) {
 	BerlekampWelchTest test(required, total);
 	auto [origdata, shares] = test.SomeShares(block);
 
-	Slice<uint8_t> output(origdata.size() + 1);
-	int output_len = test.Decode(output, shares);
-	output = output.slice(0, output_len);
+	std::vector<uint8_t> output(origdata.size() + 1);
+	int output_len = test.Decode(shares, output);
+	output.resize(output_len);
 	ASSERT_EQ(origdata, output);
 }
 
@@ -142,7 +154,7 @@ TEST(BerlekampWelch, TestZero) {
 
 	BerlekampWelchTest test(required, total);
 
-	Slice<uint8_t> buf(num_zeros);
+	std::vector<uint8_t> buf(num_zeros);
 	for (int i = 0; i < num_nonzeros; ++i) {
 		buf.push_back(1);
 	}
@@ -150,7 +162,7 @@ TEST(BerlekampWelch, TestZero) {
 	auto [shares, callback] = test.StoreShares();
 	test.Encode(buf, callback);
 
-	(*shares)[0].data[0]++;
+	(*shares)[0][0]++;
 
 	test.DecodeTo(*shares, BerlekampWelchTest::noop);
 }
@@ -166,7 +178,7 @@ TEST(BerlekampWelch, TestErrors) {
 	test.DecodeTo(shares, BerlekampWelchTest::noop);
 
 	for (int i = 0; i < repetitions; i++) {
-		auto shares_copy = test.CopyShares(shares);
+		std::vector<std::pair<int, std::vector<uint8_t>>> shares_copy(shares.begin(), shares.end());
 		for (int j = 0; j < block; j++) {
 			test.MutateShare(j, shares_copy[test.randn(total)]);
 			test.MutateShare(j, shares_copy[test.randn(total)]);
@@ -175,7 +187,11 @@ TEST(BerlekampWelch, TestErrors) {
 		auto [decoded_shares, callback] = test.StoreShares();
 		test.DecodeTo(shares, callback);
 
-		test.AssertEqualShares(required, shares, *decoded_shares);
+		auto shares_upto_k = shares;
+		for (int a = required; a < total; ++a) {
+			shares_upto_k.erase(a);
+		}
+		test.AssertEqualShares(shares_upto_k, *decoded_shares);
 	}
 }
 
@@ -183,14 +199,14 @@ TEST(BerlekampWelch, RandomShares) {
 	const int block = 4096;
 	const int total = 7;
 	const int required = 3;
-	const int repetitions = 500;
+	const int repetitions = 1;
 
 	BerlekampWelchTest test(required, total);
 	auto shares = test.SomeShares(block).second;
 	test.DecodeTo(shares, BerlekampWelchTest::noop);
 
 	for (int i = 0; i < repetitions; i++) {
-		auto test_shares = test.CopyShares(shares);
+		std::vector<std::pair<int, std::vector<uint8_t>>> test_shares(shares.begin(), shares.end());
 		test.PermuteShares(test_shares);
 		test_shares.resize(required+2+test.randn(total-required-2));
 
@@ -201,7 +217,10 @@ TEST(BerlekampWelch, RandomShares) {
 		auto [decoded_shares, callback] = test.StoreShares();
 		test.DecodeTo(test_shares, callback);
 
-		test.AssertEqualShares(required, shares, *decoded_shares);
+		for (int i = required; i < total; ++i) {
+			shares.erase(i);
+		}
+		test.AssertEqualShares(shares, *decoded_shares);
 	}
 }
 

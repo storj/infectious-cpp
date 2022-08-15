@@ -6,7 +6,7 @@
 #include <vector>
 #include "gtest/gtest.h"
 
-#include "fec.hpp"
+#include "infectious/fec.hpp"
 
 namespace infectious {
 namespace test {
@@ -31,28 +31,28 @@ TEST(FEC, BasicOperation) {
 	FEC code(required, total);
 
 	// seed the initial data
-	Slice<uint8_t> data(required*block);
-	for (int i = 0; i < data.size(); ++i) {
+	std::vector<uint8_t> data(required*block);
+	for (int i = 0; i < static_cast<int>(data.size()); ++i) {
 		data[i] = static_cast<uint8_t>(i);
 	}
 
 	// encode it and store to outputs
-	std::map<int, Slice<uint8_t>> outputs;
-	auto store = [&](int num, Slice<uint8_t> output_data) {
-		outputs[num] = output_data.copy();
+	std::map<int, std::vector<uint8_t>> outputs;
+	auto store = [&](int num, std::basic_string_view<uint8_t> output_data) {
+		outputs[num] = std::vector(output_data.begin(), output_data.end());
 	};
 	code.Encode(data, store);
 
 	// pick required of the total shares randomly
-	std::vector<Share> shares(required);
+	std::vector<std::pair<int, std::vector<uint8_t>>> shares(required);
 	auto share_nums = perm(total);
 	for (int i = 0; i < required; ++i) {
-		shares[i].num = share_nums[i];
-		shares[i].data = outputs[share_nums[i]];
+		shares[i].first = share_nums[i];
+		shares[i].second = outputs[share_nums[i]];
 	}
 
-	Slice<uint8_t> got(required*block);
-	auto record = [&](int num, Slice<uint8_t> output_data) {
+	std::vector<uint8_t> got(required*block);
+	auto record = [&](int num, std::basic_string_view<uint8_t> output_data) {
 		std::copy(output_data.begin(), output_data.end(), &got[num*block]);
 	};
 	code.Rebuild(shares, record);
@@ -68,28 +68,28 @@ TEST(FEC, EncodeSingle) {
 	FEC code(required, total);
 
 	// seed the initial data
-	Slice<uint8_t> data(required*block);
-	for (int i = 0; i < data.size(); ++i) {
+	std::vector<uint8_t> data(required*block);
+	for (int i = 0; i < static_cast<int>(data.size()); ++i) {
 		data[i] = static_cast<uint8_t>(i);
 	}
 
 	// encode it and store to outputs
-	std::map<int, Slice<uint8_t>> outputs;
+	std::map<int, std::vector<uint8_t>> outputs;
 	for (int i = 0; i < total; i++) {
-		outputs[i] = Slice<uint8_t>(block);
-		code.EncodeSingle(data, outputs[i].begin(), outputs[i].end(), i);
+		outputs[i] = std::vector<uint8_t>(block);
+		code.EncodeSingle(i, data.begin(), data.end(), outputs[i].begin(), outputs[i].end());
 	}
 
 	// pick required of the total shares randomly
-	std::vector<Share> shares(required);
+	std::vector<std::pair<int, std::vector<uint8_t>>> shares(required);
 	auto share_nums = perm(total);
 	for (int i = 0; i < required; ++i) {
-		shares[i].num = share_nums[i];
-		shares[i].data = outputs[share_nums[i]];
+		shares[i].first = share_nums[i];
+		shares[i].second = outputs[share_nums[i]];
 	}
 
-	Slice<uint8_t> got(required*block);
-	auto record = [&](int num, Slice<uint8_t> output_data) {
+	std::vector<uint8_t> got(required*block);
+	auto record = [&](int num, std::basic_string_view<uint8_t> output_data) {
 		std::copy(output_data.begin(), output_data.end(), &got[num*block]);
 	};
 	code.Rebuild(shares, record);

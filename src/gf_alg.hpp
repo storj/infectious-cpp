@@ -43,7 +43,7 @@ template <typename T>
 // and its friends.
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 
-[[nodiscard]] auto gf_pow(uint8_t n, int val) -> uint8_t {
+[[nodiscard]] inline auto gf_pow(uint8_t n, int val) -> uint8_t {
 	uint8_t out = 1;
 	const auto& mul_base = gf_mul_table[n];
 	for (int i = 0; i < val; i++) {
@@ -52,11 +52,11 @@ template <typename T>
 	return out;
 }
 
-[[nodiscard]] auto gf_mul(uint8_t a, uint8_t b) -> uint8_t {
+[[nodiscard]] inline auto gf_mul(uint8_t a, uint8_t b) -> uint8_t {
 	return gf_mul_table[a][b];
 }
 
-[[nodiscard]] auto gf_div(uint8_t a, uint8_t b) -> uint8_t {
+[[nodiscard]] inline auto gf_div(uint8_t a, uint8_t b) -> uint8_t {
 	if (b == 0) {
 		throw std::domain_error("divide by zero");
 	}
@@ -66,14 +66,14 @@ template <typename T>
 	return gf_exp[gf_log[a]-gf_log[b]];
 }
 
-[[nodiscard]] auto gf_add(uint8_t a, uint8_t b) -> uint8_t {
+[[nodiscard]] inline auto gf_add(uint8_t a, uint8_t b) -> uint8_t {
 	return a ^ b;
 }
 
 // because apparently 255 is a 'magic number'
 const static int top_of_range = (1<<8) - 1;
 
-[[nodiscard]] auto gf_inv(uint8_t n) -> uint8_t {
+[[nodiscard]] inline auto gf_inv(uint8_t n) -> uint8_t {
 	if (n == 0) {
 		throw std::domain_error("invert zero");
 	}

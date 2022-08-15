@@ -19,20 +19,7 @@ auto eval_point(int num) -> uint8_t {
 
 } // namespace
 
-void FEC::Correct(const std::map<int, uint8_t*>& shares, int share_size) const {
-	if (static_cast<int>(shares.size()) < k) {
-		throw std::invalid_argument("must specify at least the number of required shares");
-	}
-
-	std::vector<uint8_t*> shares_vec(shares.size());
-	std::vector<int> shares_nums(shares.size());
-	shares_vec.resize(0);
-	shares_nums.resize(0);
-	for (auto [num, data] : shares) {
-		shares_vec.push_back(data);
-		shares_nums.push_back(num);
-	}
-
+void FEC::correct_(std::vector<uint8_t*>& shares_vec, std::vector<int>& shares_nums, int share_size) const {
 	// fast path: check to see if there are no errors by evaluating it with
 	// the syndrome matrix.
 	auto synd = syndromeMatrix(shares_nums);
