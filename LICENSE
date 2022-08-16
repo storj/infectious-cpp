@@ -2,21 +2,21 @@
 // Copyright notices
 /////////////////
 
-Copyright (C) 2022 Storj Labs, Inc.
-Copyright (C) 2016-2017 Vivint, Inc.
+Copyright (C) 1996-1998 Luigi Rizzo (luigi@iet.unipi.it)
+Copyright (C) 2009-2010,2021 Jack Lloyd (lloyd@randombit.net)
+Copyright (C) 2011 Billy Brumley (billy.brumley@aalto.fi)
 Copyright (c) 2015 Klaus Post
 Copyright (c) 2015 Backblaze
-Copyright (C) 2011 Billy Brumley (billy.brumley@aalto.fi)
-Copyright (C) 2009-2010 Jack Lloyd (lloyd@randombit.net)
-Copyright (C) 1996-1998 Luigi Rizzo (luigi@iet.unipi.it)
+Copyright (C) 2016-2017 Vivint, Inc.
+Copyright (C) 2022 Storj Labs, Inc.
 
 Portions derived from code by Phil Karn (karn@ka9q.ampr.org),
 Robert Morelos-Zaragoza (robert@spectra.eng.hawaii.edu) and Hari
 Thirumoorthy (harit@spectra.eng.hawaii.edu), Aug 1995
 
 /////////////////
-// Portions of this project (labeled in each file) are licensed under this
-// license:
+// Portions of this project (labeled in each file) are licensed under
+// the 2-clause ("Simplified") BSD License:
 /////////////////
 
 Redistribution and use in source and binary forms, with or without

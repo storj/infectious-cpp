@@ -13,6 +13,8 @@
 #include <utility>
 #include <vector>
 
+#include "infectious/build_env.h"
+
 namespace infectious {
 
 using namespace std::literals;
@@ -404,12 +406,22 @@ private:
 		uint8_t* z_begin, const uint8_t* z_end,
 		const uint8_t* x, uint8_t y
 	);
+#if defined(INFECTIOUS_HAS_VPERM)
+	static size_t addmul_vperm(uint8_t z[], const uint8_t x[], uint8_t y, size_t size);
+#endif
+#if defined(INFECTIOUS_HAS_SSE2)
+	static size_t addmul_sse2(uint8_t z[], const uint8_t x[], uint8_t y, size_t size);
+#endif
 
 	int k;
 	int n;
 	std::vector<uint8_t> enc_matrix;
 	std::vector<uint8_t> vand_matrix;
 };
+
+auto addmul_provider() -> std::string;
+
+auto build_environment() -> const char*;
 
 } // namespace infectious
 

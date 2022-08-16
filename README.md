@@ -27,13 +27,6 @@ several different processor families.
 
 (Todo)
 
-### Thanks
-
-We're forever indebted to the giants on whose shoulders we stand. The LICENSE 
-has our full copyright history, but an extra special thanks to Klaus Post for 
-much of the initial Go code. See his post for more: 
-http://blog.klauspost.com/blazingly-fast-reed-solomon-coding/
-
 ### LICENSE
 
  * Copyright (C) 2022 Storj Labs, Inc.
@@ -41,7 +34,7 @@ http://blog.klauspost.com/blazingly-fast-reed-solomon-coding/
  * Copyright (c) 2015 Klaus Post
  * Copyright (c) 2015 Backblaze
  * Copyright (C) 2011 Billy Brumley (billy.brumley@aalto.fi)
- * Copyright (C) 2009-2010 Jack Lloyd (lloyd@randombit.net)
+ * Copyright (C) 2009-2010,2021 Jack Lloyd (lloyd@randombit.net)
  * Copyright (C) 1996-1998 Luigi Rizzo (luigi@iet.unipi.it)
 
 Portions derived from code by Phil Karn (karn@ka9q.ampr.org),
@@ -51,6 +44,7 @@ Thirumoorthy (harit@spectra.eng.hawaii.edu), Aug 1995
 **Portions of this project (labeled in each file) are licensed under this
 license:**
 
+```
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
 met:
@@ -74,9 +68,11 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
 IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+```
 
 **All other portions of this project are licensed under this license:**
 
+```
 The MIT License (MIT)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -96,3 +92,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```

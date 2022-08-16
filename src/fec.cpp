@@ -190,4 +190,8 @@ void FEC::createInvertedVdm(std::vector<uint8_t>& vdm, int k) {
 
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
+auto build_environment() -> const char* {
+	return "compiler=" INFECTIOUS_BUILD_COMPILER " arch=" INFECTIOUS_TARGET_ARCH " os=" INFECTIOUS_TARGET_OS;
+}
+
 } // namespace infectious
