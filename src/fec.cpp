@@ -150,7 +150,7 @@ void FEC::invertMatrix(std::vector<uint8_t>& matrix, int k) {
 // NOLINTEND(readability-function-cognitive-complexity)
 
 void FEC::createInvertedVdm(std::vector<uint8_t>& vdm, int k) {
-	if (k == 1) {
+	if (k <= 1) {
 		vdm[0] = 1;
 		return;
 	}
