@@ -12,17 +12,6 @@ to achieve the ability to actually correct errors.
 
 [Some bright folks at Vivint wrote a blog post about how this library works!](https://innovation.vivint.com/introduction-to-reed-solomon-bc264d0794f8)
 
-### Important note
-
-The optimized versions of the 'multiply and add a row' function are not present
-(yet) in this port. Nearly all operations will be significantly slower than the
-Go library until that is remedied. All that is needed is a good way to query
-and handle CPUID information without excessive clutter, so that the right
-optimized addmul() for the current CPU can be called.
-
-See the Botan project for examples of SIMD-optimized addmul() functions for
-several different processor families.
-
 ### Example
 
 (Todo)
