@@ -1,3 +1,6 @@
+// Copyright (C) 2022 Storj Labs, Inc.
+// See LICENSE for copying information.
+
 #include <algorithm>
 #include <array>
 #include <map>
