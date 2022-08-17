@@ -199,14 +199,15 @@ TEST(BerlekampWelch, RandomShares) {
 	const int block = 4096;
 	const int total = 7;
 	const int required = 3;
-	const int repetitions = 1;
+	const int repetitions = 500;
 
 	BerlekampWelchTest test(required, total);
-	auto shares = test.SomeShares(block).second;
-	test.DecodeTo(shares, BerlekampWelchTest::noop);
+	auto shares_map = test.SomeShares(block).second;
+	test.DecodeTo(shares_map, BerlekampWelchTest::noop);
+	std::vector<std::pair<int, std::vector<uint8_t>>> shares(shares_map.begin(), shares_map.end());
 
 	for (int i = 0; i < repetitions; i++) {
-		std::vector<std::pair<int, std::vector<uint8_t>>> test_shares(shares.begin(), shares.end());
+		std::vector<std::pair<int, std::vector<uint8_t>>> test_shares = shares;
 		test.PermuteShares(test_shares);
 		test_shares.resize(required+2+test.randn(total-required-2));
 
@@ -217,10 +218,8 @@ TEST(BerlekampWelch, RandomShares) {
 		auto [decoded_shares, callback] = test.StoreShares();
 		test.DecodeTo(test_shares, callback);
 
-		for (int i = required; i < total; ++i) {
-			shares.erase(i);
-		}
-		test.AssertEqualShares(shares, *decoded_shares);
+		std::vector<std::pair<int, std::vector<uint8_t>>> firstNShares(shares.begin(), shares.begin() + required);;
+		test.AssertEqualShares(firstNShares, *decoded_shares);
 	}
 }
 
