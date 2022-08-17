@@ -9,7 +9,8 @@ pkg_search_module(GTEST REQUIRED gtest_main)
 add_executable(infectious-test
 	berlekamp_welch_test.cpp
 	fec_test.cpp
-	gf_alg_test.cpp)
+	gf_alg_test.cpp
+	test_zfec.cpp)
 
 target_link_libraries(infectious-test infectious ${GTEST_LDFLAGS})
 target_compile_options(infectious-test PUBLIC ${GTEST_CFLAGS})
