@@ -100,6 +100,109 @@ TEST(FEC, EncodeSingle) {
 	ASSERT_EQ(data, got) << "reconstructed data did not match";
 }
 
+// NoCopyBytes is a class holding a byte string which should only be copyable
+// using explicit calls to its begin() and end() methods.
+class NoCopyBytes {
+public:
+	template <typename... Args>
+	NoCopyBytes(Args&&... args)
+		: s_ptr(new std::basic_string<uint8_t>(std::forward<Args>(args)...))
+	{}
+
+	NoCopyBytes(NoCopyBytes&& other) = default;
+	auto operator=(NoCopyBytes&& other) -> NoCopyBytes& = default;
+	~NoCopyBytes() = default;
+
+	NoCopyBytes(const NoCopyBytes& other) = delete;
+	auto operator=(const NoCopyBytes& other) -> NoCopyBytes& = delete;
+
+	auto begin() -> std::basic_string<uint8_t>::iterator {
+		return s_ptr->begin();
+	}
+
+	auto end() -> std::basic_string<uint8_t>::iterator {
+		return s_ptr->end();
+	}
+
+	auto begin() const -> std::basic_string<uint8_t>::const_iterator {
+		return s_ptr->begin();
+	}
+
+	auto end() const -> std::basic_string<uint8_t>::const_iterator {
+		return s_ptr->end();
+	}
+
+	size_t size() const {
+		return s_ptr->size();
+	}
+
+	auto operator==(const NoCopyBytes& other) const -> bool {
+		return *s_ptr == *other.s_ptr;
+	}
+
+private:
+	std::unique_ptr<std::basic_string<uint8_t>> s_ptr;
+};
+
+// NoCopyMap is a class holding a mapping of integers to NoCopyBytes which
+// should only be copyable using explicit calls to its begin() and end()
+// methods.
+class NoCopyMap {
+public:
+	NoCopyMap()
+		: m_ptr(new std::map<int, NoCopyBytes>())
+	{}
+
+	NoCopyMap(NoCopyMap&& other) = default;
+	auto operator=(NoCopyMap&& other) -> NoCopyMap& = default;
+	~NoCopyMap() = default;
+
+	NoCopyMap(const NoCopyMap& other) = delete;
+	auto operator=(const NoCopyMap& other) -> NoCopyMap& = delete;
+
+	auto size() -> size_t {
+		return m_ptr->size();
+	}
+
+	auto begin() -> std::map<int, NoCopyBytes>::iterator {
+		return m_ptr->begin();
+	}
+
+	auto end() -> std::map<int, NoCopyBytes>::iterator {
+		return m_ptr->end();
+	}
+
+	template <typename... Args>
+	auto emplace(Args&&... args) {
+		return m_ptr->emplace(std::forward<Args>(args)...);
+	}
+
+private:
+	std::unique_ptr<std::map<int, NoCopyBytes>> m_ptr;
+};
+
+// Test that non-implicitly-copyable objects can be used with the FEC methods.
+TEST(FEC, NoImplicitCopies) {
+	const int total = 40;
+	const int required = 20;
+
+	NoCopyMap picky_map;
+	NoCopyBytes input_data(reinterpret_cast<const uint8_t*>("<Wash> Hey, I've been in a firefight before!  Well, I was in a fire.  Actually, I was fired from a fry-cook opportunity."));
+
+	FEC fec(required, total);
+	fec.Encode(input_data, [&](int num, const ByteView& output) {
+		// only keep some of the shares, so decoding has to do both copying and polynomial division
+		if (num >= (total - required) - (required/2)) {
+			picky_map.emplace(num, output);
+		}
+	});
+
+	NoCopyBytes decode_result(input_data.size(), '\0');
+	fec.Decode(picky_map, decode_result);
+
+	ASSERT_EQ(input_data, decode_result);
+}
+
 // NOLINTEND(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
 } // namespace test
