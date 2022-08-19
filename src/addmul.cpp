@@ -38,6 +38,10 @@
 
 namespace infectious {
 
+// a lot of constants are needed here, and the 'magic numbers' all make sense
+// in context.
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+
 //
 // addmul() computes z[] = z[] + x[] * y
 //
@@ -49,12 +53,12 @@ void FEC::addmul(
 		return;
 	}
 
-	auto size = z_end - z_begin;
-	auto z = z_begin;
+	long size = z_end - z_begin;
+	auto* z = z_begin;
 	const auto& gf_mul_y = gf_mul_table[y];
 
 	// first align z to 16 bytes
-	while (size > 0 && reinterpret_cast<uintptr_t>(z) % 16) {
+	while (size > 0 && (reinterpret_cast<uintptr_t>(z) % 16) != 0) {
 		z[0] ^= gf_mul_y[x[0]];
 		++z;
 		++x;
@@ -63,15 +67,15 @@ void FEC::addmul(
 
 #if defined(INFECTIOUS_HAS_VPERM)
 	if (size >= 16 && CPUID::has_vperm()) {
-		const size_t consumed = addmul_vperm(z, x, y, size);
+		const size_t consumed = addmul_vperm(z, x, y, static_cast<int>(size));
 		z += consumed;
 		x += consumed;
-		size -= consumed;
+		size -= static_cast<long>(consumed);
 	}
 #endif
 #if defined(INFECTIOUS_HAS_SSE2)
 	if (size >= 64 && CPUID::has_sse2()) {
-		const size_t consumed = addmul_sse2(z, x, y, size);
+		const size_t consumed = addmul_sse2(z, x, y, static_cast<int>(size));
 		z += consumed;
 		x += consumed;
 		size -= consumed;
@@ -102,7 +106,7 @@ void FEC::addmul(
 	}
 
 	// Clean up the trailing pieces
-	for (int i = 0; i < size; ++i) {
+	for (long i = 0; i < size; ++i) {
 		z[i] ^= gf_mul_y[x[i]];
 	}
 }
@@ -114,8 +118,6 @@ auto addmul_provider() -> std::string {
 		return "ssse3";
 #elif defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY)
 		return "neon";
-#elif defined(INFECTIOUS_TARGET_CPU_IS_PPC_FAMILY)
-		return "altivec";
 #else
 		return "vperm/unknown";
 #endif
@@ -128,5 +130,7 @@ auto addmul_provider() -> std::string {
 #endif
 	return "none";
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
 } // namespace infectious

@@ -109,7 +109,7 @@ void FEC::invertMatrix(std::vector<uint8_t>& matrix, int k) {
 
 		indxr[col] = irow;
 		indxc[col] = icol;
-		auto pivot_row = &matrix[icol*k];
+		auto* pivot_row = &matrix[icol*k];
 		auto c = pivot_row[icol];
 
 		if (c == 0) {
@@ -128,7 +128,7 @@ void FEC::invertMatrix(std::vector<uint8_t>& matrix, int k) {
 
 		id_row[icol] = 1;
 		if (std::memcmp(pivot_row, id_row.data(), k) != 0) {
-			auto p = matrix.data();
+			auto* p = matrix.data();
 			for (int i = 0; i < k; i++) {
 				if (i != icol) {
 					c = p[icol];

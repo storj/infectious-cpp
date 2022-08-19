@@ -41,7 +41,7 @@ using ByteView = std::basic_string_view<uint8_t>;
 
 using ShareOutputFunc = std::function<void(int num, ByteView output)>;
 
-namespace {
+namespace internal {
 	template <typename T, typename = void>
 	struct is_sortable : std::false_type {};
 
@@ -291,7 +291,7 @@ public:
 
 	// if shares is sortable in-place, we will do that.
 	template <typename ShareMap>
-	struct rebuild_specialization<ShareMap, std::enable_if_t<is_sortable_v<ShareMap>>> {
+	struct rebuild_specialization<ShareMap, std::enable_if_t<internal::is_sortable_v<ShareMap>>> {
 		static void SortAndRebuild(FEC* this_, ShareMap& shares, const ShareOutputFunc& output) {
 			std::sort(shares);
 			this_->RebuildSorted(shares, output);
@@ -376,7 +376,7 @@ public:
 		std::vector<int> shares_nums(shares.size());
 		shares_vec.resize(0);
 		shares_nums.resize(0);
-		int share_size = 0;
+		long share_size = 0;
 		for (auto& share : shares) {
 			auto& v = share_data(share);
 			uint8_t* data_start = std::to_address(std::begin(v));
@@ -396,7 +396,7 @@ private:
 	class GFMat;
 
 	void initialize();
-	void correct_(std::vector<uint8_t*>& shares_vec, std::vector<int>& shares_nums, int share_size) const;
+	void correct_(std::vector<uint8_t*>& shares_vec, std::vector<int>& shares_nums, long share_size) const;
 	[[nodiscard]] auto syndromeMatrix(const std::vector<int>& shares_nums) const -> GFMat;
 
 	static void invertMatrix(std::vector<uint8_t>& matrix, int k);
@@ -407,10 +407,10 @@ private:
 		const uint8_t* x, uint8_t y
 	);
 #if defined(INFECTIOUS_HAS_VPERM)
-	static size_t addmul_vperm(uint8_t z[], const uint8_t x[], uint8_t y, size_t size);
+	static auto addmul_vperm(uint8_t* z, const uint8_t* x, uint8_t y, size_t size) -> size_t;
 #endif
 #if defined(INFECTIOUS_HAS_SSE2)
-	static size_t addmul_sse2(uint8_t z[], const uint8_t x[], uint8_t y, size_t size);
+	static auto addmul_sse2(uint8_t* z, const uint8_t* x, uint8_t y, size_t size) -> size_t;
 #endif
 
 	int k;

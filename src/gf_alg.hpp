@@ -7,12 +7,15 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
+#include "infectious/fec.hpp"
 #include "tables.hpp"
 
 namespace infectious {
 
-namespace {
+namespace internal {
 
 template <typename T>
 [[nodiscard]] auto hex_string(const T& t) -> std::string {
@@ -24,16 +27,11 @@ template <typename T>
 	return ss.str();
 }
 
-[[nodiscard]] auto hex_string(const uint8_t* t, int len) -> std::string {
-	std::stringstream ss;
-	ss << std::hex;
-	for (int i = 0; i < len; ++i) {
-		ss << std::setfill('0') << std::setw(2) << int(t[i]);
-	}
-	return ss.str();
+[[nodiscard]] auto inline hex_string(const uint8_t* t, long len) -> std::string {
+	return hex_string(std::basic_string_view<uint8_t>(t, len));
 }
 
-} // namespace
+} // namespace internal
 
 //
 // basic helpers around gf(2^8) values
@@ -87,7 +85,7 @@ const static int top_of_range = (1<<8) - 1;
 //
 
 template <typename TA, typename TB>
-auto gf_dot(const TA& a, const TB& b) -> uint8_t {
+[[nodiscard]] auto gf_dot(const TA& a, const TB& b) -> uint8_t {
 	auto a_size = a.size();
 	uint8_t out = 0;
 	for (decltype(a_size) i = 0; i < a_size; ++i) {
@@ -113,15 +111,15 @@ public:
 		: values {std::vector<uint8_t>(size, 0)}
 		, start_at {0} {}
 
-	auto size() const -> int {
+	[[nodiscard]] auto size() const -> int {
 		return static_cast<int>(values.size()) - start_at;
 	}
 
-	auto deg() const -> int {
+	[[nodiscard]] auto deg() const -> int {
 		return static_cast<int>(size()) - 1;
 	}
 
-	auto scale(uint8_t factor) const -> GFPoly {
+	[[nodiscard]] auto scale(uint8_t factor) const -> GFPoly {
 		std::vector<uint8_t> out(size(), 0);
 		for (int i = 0; i < static_cast<int>(out.size()); ++i) {
 			out[i] = gf_mul((*this)[i], factor);
@@ -129,7 +127,7 @@ public:
 		return GFPoly(std::move(out));
 	}
 
-	auto index(int power) const -> uint8_t {
+	[[nodiscard]] auto index(int power) const -> uint8_t {
 		if (power < 0) {
 			return 0;
 		}
@@ -152,7 +150,7 @@ public:
 		values[start_at + which] = coef;
 	}
 
-	auto add(const GFPoly& b) const -> GFPoly {
+	[[nodiscard]] auto add(const GFPoly& b) const -> GFPoly {
 		auto len = size();
 		if (b.size() > len) {
 			len = b.size();
@@ -166,7 +164,7 @@ public:
 		return out;
 	}
 
-	auto is_zero() const -> bool {
+	[[nodiscard]] auto is_zero() const -> bool {
 		return std::all_of(values.begin() + start_at, values.end(), [](uint8_t v) -> bool { return v == 0; });
 	}
 
@@ -243,7 +241,7 @@ public:
 		start_at += elements;
 	}
 
-	auto eval(uint8_t x) const -> uint8_t {
+	[[nodiscard]] auto eval(uint8_t x) const -> uint8_t {
 		uint8_t out = 0;
 		for (int i = 0; i <= deg(); ++i) {
 			auto x_i = gf_pow(x, i);
@@ -270,7 +268,7 @@ private:
 
 class FEC::GFMat {
 public:
-	GFMat(int i, int j)
+	GFMat(long i, long j)
 		: d(i*j)
 		, r {i}
 		, c {j}
@@ -282,55 +280,55 @@ public:
 		}
 
 		std::stringstream ss;
-		for (int i = 0; i < r-1; i++) {
-			ss << hex_string(index_row(i), c) << '\n';
+		for (long i = 0; i < r-1; i++) {
+			ss << internal::hex_string(index_row(i), c) << '\n';
 		}
-		ss << hex_string(index_row(r - 1), c);
+		ss << internal::hex_string(index_row(r - 1), c);
 		return ss.str();
 	}
 
-	[[nodiscard]] auto index(int i, int j) const -> int {
+	[[nodiscard]] auto index(long i, long j) const -> long {
 		return c * i + j;
 	}
 
-	[[nodiscard]] auto get(int i, int j) const -> uint8_t {
+	[[nodiscard]] auto get(long i, long j) const -> uint8_t {
 		return d[index(i, j)];
 	}
 
-	void set(int i, int j, uint8_t val) {
+	void set(long i, long j, uint8_t val) {
 		d[index(i, j)] = val;
 	}
 
-	[[nodiscard]] auto index_row(int i) -> uint8_t* {
+	[[nodiscard]] auto index_row(long i) -> uint8_t* {
 		return &d[index(i, 0)];
 	}
 
-	[[nodiscard]] auto index_row(int i) const -> const uint8_t* {
+	[[nodiscard]] auto index_row(long i) const -> const uint8_t* {
 		return &d[index(i, 0)];
 	}
 
-	void swap_row(int i, int j) {
+	void swap_row(long i, long j) {
 		std::vector<uint8_t> tmp(c, 0);
-		auto ri = index_row(i);
-		auto rj = index_row(j);
+		auto* ri = index_row(i);
+		auto* rj = index_row(j);
 		std::copy(ri, ri + c, tmp.begin());
 		std::copy(rj, rj + c, ri);
 		std::copy(tmp.begin(), tmp.end(), rj);
 	}
 
-	void scale_row(int r, uint8_t val) {
-		auto ri = index_row(r);
-		for (int i = 0; i < c; ++i) {
+	void scale_row(long r, uint8_t val) {
+		auto* ri = index_row(r);
+		for (long i = 0; i < c; ++i) {
 			ri[i] = gf_mul(ri[i], val);
 		}
 	}
 
 	// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
 
-	void addmul_row(int i, int j, uint8_t val) {
-		auto ri = index_row(i);
-		auto rj = index_row(j);
-		FEC::addmul(rj, rj + c, ri, uint8_t(val));
+	void addmul_row(long i, long j, uint8_t val) {
+		auto* ri = index_row(i);
+		auto* rj = index_row(j);
+		FEC::addmul(rj, rj + c, ri, val);
 	}
 
 	// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -338,10 +336,10 @@ public:
 	// in place invert. the output is put into a and *this is turned into the
 	// identity matrix. a is expected to be the identity matrix.
 	void invert_with(GFMat& a) {
-		for (int i = 0; i < r; i++) {
-			int p_row = i;
+		for (long i = 0; i < r; i++) {
+			long p_row = i;
 			auto p_val = get(i, i);
-			for (int j = i + 1; j < r && p_val == 0; j++) {
+			for (long j = i + 1; j < r && p_val == 0; j++) {
 				p_row = j;
 				p_val = get(j, i);
 			}
@@ -358,15 +356,15 @@ public:
 			scale_row(i, inv);
 			a.scale_row(i, inv);
 
-			for (int j = i + 1; j < r; j++) {
+			for (long j = i + 1; j < r; j++) {
 				auto leading = get(j, i);
 				addmul_row(i, j, leading);
 				a.addmul_row(i, j, leading);
 			}
 		}
 
-		for (int i = r - 1; i > 0; i--) {
-			for (int j = i - 1; j >= 0; j--) {
+		for (long i = r - 1; i > 0; i--) {
+			for (long j = i - 1; j >= 0; j--) {
 				auto trailing = get(j, i);
 				addmul_row(i, j, trailing);
 				a.addmul_row(i, j, trailing);
@@ -377,9 +375,9 @@ public:
 	// in place standardize.
 	void standardize() {
 		for (int i = 0; i < r; i++) {
-			int p_row = i;
+			long p_row = i;
 			auto p_val = get(i, i);
-			for (int j = i + 1; j < r && p_val == 0; j++) {
+			for (long j = i + 1; j < r && p_val == 0; j++) {
 				p_row = j;
 				p_val = get(j, i);
 			}
@@ -394,14 +392,14 @@ public:
 			auto inv = gf_inv(p_val);
 			scale_row(i, inv);
 
-			for (int j = i + 1; j < r; j++) {
+			for (long j = i + 1; j < r; j++) {
 				auto leading = get(j, i);
 				addmul_row(i, j, leading);
 			}
 		}
 
-		for (int i = r - 1; i > 0; i--) {
-			for (int j = i - 1; j >= 0; j--) {
+		for (long i = r - 1; i > 0; i--) {
+			for (long j = i - 1; j >= 0; j--) {
 				auto trailing = get(j, i);
 				addmul_row(i, j, trailing);
 			}
@@ -426,13 +424,13 @@ public:
 		GFMat out(c-r, c);
 
 		// step 1. fill in the identity. it starts at column offset r.
-		for (int i = 0; i < c-r; i++) {
+		for (long i = 0; i < c-r; i++) {
 			out.set(i, i+r, 1);
 		}
 
 		// step 2: fill in the transposed P matrix. i and j are in terms of out.
-		for (int i = 0; i < c-r; i++) {
-			for (int j = 0; j < r; j++) {
+		for (long i = 0; i < c-r; i++) {
+			for (long j = 0; j < r; j++) {
 				out.set(i, j, get(j, i+r));
 			}
 		}
@@ -440,18 +438,18 @@ public:
 		return out;
 	}
 
-	[[nodiscard]] auto get_r() const -> int {
+	[[nodiscard]] auto get_r() const -> long {
 		return r;
 	}
 
-	[[nodiscard]] auto get_c() const -> int {
+	[[nodiscard]] auto get_c() const -> long {
 		return c;
 	}
 
 private:
 	std::vector<uint8_t> d;
-	int r;
-	int c;
+	long r;
+	long c;
 };
 
 } // namespace infectious

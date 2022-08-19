@@ -18,11 +18,10 @@
 #include <system_error>
 
 #if defined(INFECTIOUS_TARGET_OS_HAS_POSIX1)
-# include <signal.h>
-# include <stdlib.h>
-# include <setjmp.h>
+# include <csignal>
+# include <csetjmp>
+# include <cerrno>
 # include <unistd.h>
-# include <errno.h>
 #endif
 
 #if defined(INFECTIOUS_TARGET_OS_HAS_GETAUXVAL) || defined(INFECTIOUS_TARGET_OS_HAS_ELF_AUX_INFO)
@@ -45,9 +44,9 @@ extern "C" char **environ;
 # include <mach/vm_statistics.h>
 #endif
 
-namespace infectious {
+namespace infectious::OS {
 
-unsigned long OS::get_auxval(unsigned long id) {
+auto get_auxval(unsigned long id) -> unsigned long {
 #if defined(INFECTIOUS_TARGET_OS_HAS_GETAUXVAL)
 	return ::getauxval(id);
 #elif defined(INFECTIOUS_TARGET_OS_IS_ANDROID) && defined(INFECTIOUS_TARGET_ARCH_IS_ARM32)
@@ -90,9 +89,11 @@ unsigned long OS::get_auxval(unsigned long id) {
 
 namespace {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 ::sigjmp_buf g_sigill_jmp_buf;
 
 void infectious_sigill_handler(int /*unused*/) {
+	// this is idiomatic usage. NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 	siglongjmp(g_sigill_jmp_buf, /*non-zero return value*/1);
 }
 
@@ -100,12 +101,12 @@ void infectious_sigill_handler(int /*unused*/) {
 
 #endif
 
-int OS::run_cpu_instruction_probe(const std::function<int ()>& probe_fn) {
+auto run_cpu_instruction_probe(const std::function<int ()>& probe_fn) -> int {
 	volatile int probe_result = -3;
 
 #if defined(INFECTIOUS_TARGET_OS_HAS_POSIX1)
-	struct sigaction old_sigaction;
-	struct sigaction sigaction;
+	struct sigaction old_sigaction {};
+	struct sigaction sigaction {};
 
 	sigaction.sa_handler = infectious_sigill_handler;
 	sigemptyset(&sigaction.sa_mask);
@@ -117,6 +118,7 @@ int OS::run_cpu_instruction_probe(const std::function<int ()>& probe_fn) {
 		throw std::system_error(errno, std::generic_category(), "run_cpu_instruction_probe sigaction failed");
 	}
 
+	// this is idiomatic usage. NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 	rc = sigsetjmp(g_sigill_jmp_buf, /*save sigs*/1);
 
 	if(rc == 0) {
@@ -140,4 +142,4 @@ int OS::run_cpu_instruction_probe(const std::function<int ()>& probe_fn) {
 	return probe_result;
 }
 
-} // namespace infectious
+} // namespace infectious::OS

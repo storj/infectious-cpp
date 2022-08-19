@@ -16,30 +16,14 @@
 
 namespace infectious {
 
-//static
-void CPUID::initialize() {
-	state() = CPUID_Data();
-}
-
-CPUID::CPUID_Data::CPUID_Data() {
-	m_processor_features = 0;
-
-#if defined(INFECTIOUS_TARGET_CPU_IS_PPC_FAMILY) || \
-	defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY) || \
-	defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
-	m_processor_features = detect_cpu_features();
-#endif
-
-	m_processor_features |= CPUID::CPUID_INITIALIZED_BIT;
-
-	m_endian_status = runtime_check_endian();
-}
+// they're not magic numbers, they're an endian check.
+// NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 
 //static
-CPUID::Endian_Status CPUID::CPUID_Data::runtime_check_endian() {
+auto CPUID::CPUID_Data::runtime_check_endian() -> CPUID::Endian_Status {
 	// Check runtime endian
 	uint32_t endian32 = 0x01234567;
-	const uint8_t* e8 = reinterpret_cast<const uint8_t*>(&endian32);
+	const auto* e8 = reinterpret_cast<const uint8_t*>(&endian32);
 
 	CPUID::Endian_Status endian = CPUID::Endian_Status::Unknown;
 
@@ -61,5 +45,6 @@ CPUID::Endian_Status CPUID::CPUID_Data::runtime_check_endian() {
 	return endian;
 }
 
+// NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 
 } // namespace infectious

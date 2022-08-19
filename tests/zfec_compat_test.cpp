@@ -18,15 +18,14 @@
 
 #include "infectious/fec.hpp"
 
-namespace infectious {
-namespace test {
+namespace infectious::test {
 
-#define DATADIR_ENVVAR "INFECTIOUS_TEST_DATA_DIR"
+constexpr const char* datadir_envvar = "INFECTIOUS_TEST_DATA_DIR";
 
-auto parse_line(std::string line) -> std::pair<std::string, std::string> {
+auto parse_line(const std::string& line) -> std::pair<std::string, std::string> {
 	const std::string delimiter(" = ");
-	size_t pos;
-	if ((pos = line.find(delimiter)) == std::string::npos) {
+	size_t pos = line.find(delimiter);
+	if (pos == std::string::npos) {
 		throw std::runtime_error("invalid syntax in test data file");
 	}
 	auto varname = line.substr(0, pos);
@@ -43,7 +42,7 @@ auto read_vec_data(std::istream& i) -> std::map<std::string, std::string> {
 
 		// strip beginning whitespace
 		const char* p = &linec[0];
-		while (*p != '\0' && std::isspace(*p)) {
+		while (*p != '\0' && std::isspace(*p) != 0) {
 			++p;
 		}
 		// ignore comments
@@ -72,11 +71,14 @@ auto unhexlify(const std::string& hexstr) -> std::vector<uint8_t> {
 	as_bytes.reserve(hexstr.length() / 2);
 	for (size_t i = 0; i < hexstr.length(); i += 2) {
 		const std::string digits = hexstr.substr(i, 2);
-		uint8_t byte = static_cast<uint8_t>(std::stoi(digits, nullptr, 16));
+		auto byte = static_cast<uint8_t>(std::stoi(digits, nullptr, 16));
 		as_bytes.push_back(byte);
 	}
 	return as_bytes;
 }
+
+// clang-tidy doesn't much care for gtest's macros.
+// NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
 void perform_test(int k, int n, const std::vector<uint8_t>& data, const std::vector<uint8_t>& code) {
 	ASSERT_EQ(static_cast<int>(data.size()) % k, 0) << "input string is not a multiple of " << k << " bytes";
@@ -87,9 +89,9 @@ void perform_test(int k, int n, const std::vector<uint8_t>& data, const std::vec
 	for (int i = 0; i < n; ++i) {
 		std::basic_string<uint8_t> share(share_size, '\0');
 		if (i < k) {
-			std::copy(data.begin() + share_size * i, data.begin() + share_size * (i+1), &share[0]);
+			std::copy(data.begin() + share_size * i, data.begin() + share_size * (i+1), share.data());
 		} else {
-			std::copy(code.begin() + share_size * (i-k), code.begin() + share_size * (i-k+1), &share[0]);
+			std::copy(code.begin() + share_size * (i-k), code.begin() + share_size * (i-k+1), share.data());
 		}
 		expected_shares.emplace(i, share);
 	}
@@ -132,17 +134,16 @@ void perform_test(int k, int n, const std::vector<uint8_t>& data, const std::vec
 	ASSERT_EQ(k, static_cast<int>(share_nums_seen.size())) << "wrong number of shares " << share_nums_seen.size() << " yielded from decode";
 }
 
-// for some reason, clang-tidy doesn't much care for gtest's macros.
-// NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
-
 TEST(FEC, OutputMatchesZfec) {
-	const char* data_dir = std::getenv(DATADIR_ENVVAR);
+	// Does not need to be threadsafe here.
+	// NOLINTNEXTLINE(concurrency-mt-unsafe)
+	const char* data_dir = std::getenv(datadir_envvar);
 	if (data_dir == nullptr) {
 		data_dir = "./tests/data";
 	}
 	auto data_file_path = std::filesystem::path(data_dir) / "zfec.vec";
 	std::ifstream dataf(data_file_path);
-	ASSERT_TRUE(!!dataf) << "Can not find test data file (set $" DATADIR_ENVVAR ")";
+	ASSERT_TRUE(!!dataf) << "Can not find test data file (set $" << datadir_envvar << ")";
 
 	int num_tests = 0;
 	while (dataf.good()) {
@@ -176,5 +177,6 @@ TEST(FEC, OutputMatchesZfec) {
 	ASSERT_GE(num_tests, 80);
 }
 
-} // namespace test
-} // namespace infectious
+// NOLINTEND(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
+
+} // namespace infectious::test

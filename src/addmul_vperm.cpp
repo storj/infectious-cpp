@@ -544,7 +544,7 @@ alignas(256) const uint8_t GFTBL[256*32] = {
 0x00, 0x4b, 0x96, 0xdd, 0x31, 0x7a, 0xa7, 0xec, 0x62, 0x29, 0xf4, 0xbf, 0x53, 0x18, 0xc5, 0x8e
 };
 
-inline SIMD_4x32 INFECTIOUS_FUNC_ISA(INFECTIOUS_VPERM_ISA) table_lookup(SIMD_4x32 t, SIMD_4x32 v) {
+inline auto INFECTIOUS_FUNC_ISA(INFECTIOUS_VPERM_ISA) table_lookup(SIMD_4x32 t, SIMD_4x32 v) -> SIMD_4x32 {
 #if defined(INFECTIOUS_SIMD_USE_SSE2)
 	return SIMD_4x32(_mm_shuffle_epi8(t.raw(), v.raw()));
 #elif defined(INFECTIOUS_SIMD_USE_NEON)
@@ -569,12 +569,12 @@ inline SIMD_4x32 INFECTIOUS_FUNC_ISA(INFECTIOUS_VPERM_ISA) table_lookup(SIMD_4x3
 } // namespace
 
 INFECTIOUS_FUNC_ISA(INFECTIOUS_VPERM_ISA)
-size_t FEC::addmul_vperm(uint8_t z[], const uint8_t x[], uint8_t y, size_t size) {
+auto FEC::addmul_vperm(uint8_t* z, const uint8_t* x, uint8_t y, size_t size) -> size_t {
 	const auto mask = SIMD_4x32::splat_u8(0x0F);
 
 	// fetch the lookup tables for the given y
-	const auto t_lo = SIMD_4x32::load_le(GFTBL + 32*y);
-	const auto t_hi = SIMD_4x32::load_le(GFTBL + 32*y + 16);
+	const auto t_lo = SIMD_4x32::load_le(&GFTBL[32*y]);
+	const auto t_hi = SIMD_4x32::load_le(&GFTBL[32*y + 16]);
 
 	const size_t orig_size = size;
 

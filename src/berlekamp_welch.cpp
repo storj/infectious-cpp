@@ -19,7 +19,7 @@ auto eval_point(int num) -> uint8_t {
 
 } // namespace
 
-void FEC::correct_(std::vector<uint8_t*>& shares_vec, std::vector<int>& shares_nums, int share_size) const {
+void FEC::correct_(std::vector<uint8_t*>& shares_vec, std::vector<int>& shares_nums, long share_size) const {
 	// fast path: check to see if there are no errors by evaluating it with
 	// the syndrome matrix.
 	auto synd = syndromeMatrix(shares_nums);
@@ -88,7 +88,7 @@ auto FEC::berlekampWelch(const std::vector<uint8_t*>& shares_vec, const std::vec
 
 	// multiply the inverted matrix by the column vector
 	for (int i = 0; i < dim; i++) {
-		auto ri = a.index_row(i);
+		auto *ri = a.index_row(i);
 		u[i] = gf_dot(f, ri);
 	}
 

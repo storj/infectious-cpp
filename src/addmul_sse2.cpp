@@ -18,20 +18,22 @@
 
 namespace infectious {
 
+// NOLINTBEGIN(portability-simd-intrinsics)
+
 namespace {
 
-inline SIMD_4x32 rshift_1_u8(SIMD_4x32 v) {
+inline auto rshift_1_u8(SIMD_4x32 v) -> SIMD_4x32 {
 	return SIMD_4x32(_mm_add_epi8(v.raw(), v.raw()));
 }
 
-inline SIMD_4x32 high_bit_set_u8(SIMD_4x32 v) {
+inline auto high_bit_set_u8(SIMD_4x32 v) -> SIMD_4x32 {
 	return SIMD_4x32(_mm_cmpgt_epi8(_mm_setzero_si128(), v.raw()));
 }
 
 } // namespace
 
 INFECTIOUS_FUNC_ISA("sse2")
-size_t FEC::addmul_sse2(uint8_t z[], const uint8_t x[], uint8_t y, size_t size) {
+auto FEC::addmul_sse2(uint8_t* z, const uint8_t* x, uint8_t y, size_t size) -> size_t {
 	const SIMD_4x32 polynomial = SIMD_4x32::splat_u8(0x1D);
 
 	const size_t orig_size = size;
@@ -99,5 +101,7 @@ size_t FEC::addmul_sse2(uint8_t z[], const uint8_t x[], uint8_t y, size_t size) 
 }
 
 } // namespace infectious
+
+// NOLINTEND(portability-simd-intrinsics)
 
 #endif // defined(INFECTIOUS_HAS_SSE2)

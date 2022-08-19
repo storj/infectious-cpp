@@ -12,6 +12,8 @@ project(
 
 add_compile_options(-Wall -Wextra -pedantic -Werror)
 
+set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+
 add_subdirectory(src)
 
 # Only do the following if this is the main project, and not included in something else

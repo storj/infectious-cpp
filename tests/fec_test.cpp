@@ -10,32 +10,30 @@
 #include "gtest/gtest.h"
 
 #include "infectious/fec.hpp"
+#include "random_env.hpp"
 
-namespace infectious {
-namespace test {
+namespace infectious::test {
 
 // for some reason, clang-tidy doesn't much care for gtest's macros.
 // NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
-extern std::random_device rd;
-
 std::vector<int> perm(int n) {
 	std::vector<int> nums(n);
 	std::iota(nums.begin(), nums.end(), 0);
-	std::shuffle(nums.begin(), nums.end(), rd);
+	std::shuffle(nums.begin(), nums.end(), random_env->rd);
 	return nums;
 }
 
 TEST(FEC, BasicOperation) {
-	const int block = 1024 * 1024;
-	const int total = 40;
-	const int required = 20;
+	const size_t block = 1024UL * 1024UL;
+	const size_t total = 40;
+	const size_t required = 20;
 
 	FEC code(required, total);
 
 	// seed the initial data
 	std::vector<uint8_t> data(required*block);
-	for (int i = 0; i < static_cast<int>(data.size()); ++i) {
+	for (size_t i = 0; i < data.size(); ++i) {
 		data[i] = static_cast<uint8_t>(i);
 	}
 
@@ -47,16 +45,16 @@ TEST(FEC, BasicOperation) {
 	code.Encode(data, store);
 
 	// pick required of the total shares randomly
-	std::vector<std::pair<int, std::vector<uint8_t>>> shares(required);
+	std::vector<std::pair<size_t, std::vector<uint8_t>>> shares(required);
 	auto share_nums = perm(total);
-	for (int i = 0; i < required; ++i) {
+	for (size_t i = 0; i < required; ++i) {
 		shares[i].first = share_nums[i];
 		shares[i].second = outputs[share_nums[i]];
 	}
 
 	std::vector<uint8_t> got(required*block);
 	auto record = [&](int num, std::basic_string_view<uint8_t> output_data) {
-		std::copy(output_data.begin(), output_data.end(), &got[num*block]);
+		std::copy(output_data.begin(), output_data.end(), &got[static_cast<size_t>(num)*block]);
 	};
 	code.Rebuild(shares, record);
 
@@ -64,21 +62,21 @@ TEST(FEC, BasicOperation) {
 }
 
 TEST(FEC, EncodeSingle) {
-	const int block = 1024 * 1024;
-	const int total = 40;
-	const int required = 20;
+	const size_t block = 1024UL * 1024UL;
+	const size_t total = 40;
+	const size_t required = 20;
 
 	FEC code(required, total);
 
 	// seed the initial data
 	std::vector<uint8_t> data(required*block);
-	for (int i = 0; i < static_cast<int>(data.size()); ++i) {
+	for (size_t i = 0; i < data.size(); ++i) {
 		data[i] = static_cast<uint8_t>(i);
 	}
 
 	// encode it and store to outputs
 	std::map<int, std::vector<uint8_t>> outputs;
-	for (int i = 0; i < total; i++) {
+	for (int i = 0; static_cast<size_t>(i) < total; i++) {
 		outputs[i] = std::vector<uint8_t>(block);
 		code.EncodeSingle(i, data.begin(), data.end(), outputs[i].begin(), outputs[i].end());
 	}
@@ -86,14 +84,14 @@ TEST(FEC, EncodeSingle) {
 	// pick required of the total shares randomly
 	std::vector<std::pair<int, std::vector<uint8_t>>> shares(required);
 	auto share_nums = perm(total);
-	for (int i = 0; i < required; ++i) {
+	for (size_t i = 0; i < required; ++i) {
 		shares[i].first = share_nums[i];
 		shares[i].second = outputs[share_nums[i]];
 	}
 
 	std::vector<uint8_t> got(required*block);
 	auto record = [&](int num, std::basic_string_view<uint8_t> output_data) {
-		std::copy(output_data.begin(), output_data.end(), &got[num*block]);
+		std::copy(output_data.begin(), output_data.end(), &got[static_cast<size_t>(num)*block]);
 	};
 	code.Rebuild(shares, record);
 
@@ -116,23 +114,23 @@ public:
 	NoCopyBytes(const NoCopyBytes& other) = delete;
 	auto operator=(const NoCopyBytes& other) -> NoCopyBytes& = delete;
 
-	auto begin() -> std::basic_string<uint8_t>::iterator {
+	[[nodiscard]] auto begin() -> std::basic_string<uint8_t>::iterator {
 		return s_ptr->begin();
 	}
 
-	auto end() -> std::basic_string<uint8_t>::iterator {
+	[[nodiscard]] auto end() -> std::basic_string<uint8_t>::iterator {
 		return s_ptr->end();
 	}
 
-	auto begin() const -> std::basic_string<uint8_t>::const_iterator {
+	[[nodiscard]] auto begin() const -> std::basic_string<uint8_t>::const_iterator {
 		return s_ptr->begin();
 	}
 
-	auto end() const -> std::basic_string<uint8_t>::const_iterator {
+	[[nodiscard]] auto end() const -> std::basic_string<uint8_t>::const_iterator {
 		return s_ptr->end();
 	}
 
-	size_t size() const {
+	[[nodiscard]] size_t size() const {
 		return s_ptr->size();
 	}
 
@@ -160,15 +158,15 @@ public:
 	NoCopyMap(const NoCopyMap& other) = delete;
 	auto operator=(const NoCopyMap& other) -> NoCopyMap& = delete;
 
-	auto size() -> size_t {
+	[[nodiscard]] auto size() -> size_t {
 		return m_ptr->size();
 	}
 
-	auto begin() -> std::map<int, NoCopyBytes>::iterator {
+	[[nodiscard]] auto begin() -> std::map<int, NoCopyBytes>::iterator {
 		return m_ptr->begin();
 	}
 
-	auto end() -> std::map<int, NoCopyBytes>::iterator {
+	[[nodiscard]] auto end() -> std::map<int, NoCopyBytes>::iterator {
 		return m_ptr->end();
 	}
 
@@ -183,8 +181,8 @@ private:
 
 // Test that non-implicitly-copyable objects can be used with the FEC methods.
 TEST(FEC, NoImplicitCopies) {
-	const int total = 40;
-	const int required = 20;
+	const size_t total = 40;
+	const size_t required = 20;
 
 	NoCopyMap picky_map;
 	NoCopyBytes input_data(reinterpret_cast<const uint8_t*>("<Wash> Hey, I've been in a firefight before!  Well, I was in a fire.  Actually, I was fired from a fry-cook opportunity."));
@@ -192,7 +190,7 @@ TEST(FEC, NoImplicitCopies) {
 	FEC fec(required, total);
 	fec.Encode(input_data, [&](int num, const ByteView& output) {
 		// only keep some of the shares, so decoding has to do both copying and polynomial division
-		if (num >= (total - required) - (required/2)) {
+		if (static_cast<size_t>(num) >= (total - required) - (required/2)) {
 			picky_map.emplace(num, output);
 		}
 	});
@@ -205,5 +203,4 @@ TEST(FEC, NoImplicitCopies) {
 
 // NOLINTEND(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
-} // namespace test
-} // namespace infectious
+} // namespace infectious::test

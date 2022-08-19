@@ -16,8 +16,7 @@
 
 #include "infectious/build_env.h"
 
-namespace infectious {
-namespace OS {
+namespace infectious::OS {
 
 ///
 // Return the ELF auxiliary vector cooresponding to the given ID.
@@ -26,7 +25,7 @@ namespace OS {
 //
 // Returns zero if not supported on the current system or if
 // the id provided is not known.
-unsigned long get_auxval(unsigned long id);
+auto get_auxval(unsigned long id) -> unsigned long;
 
 ///
 // Run a probe instruction to test for support for a CPU instruction.
@@ -48,9 +47,8 @@ unsigned long get_auxval(unsigned long id);
 //
 // Return codes:
 // -1 illegal instruction detected
-int run_cpu_instruction_probe(const std::function<int ()>& probe_fn);
+auto run_cpu_instruction_probe(const std::function<int ()>& probe_fn) -> int;
 
-} // namespace OS
-} // namespace infectious
+} // namespace infectious::OS
 
 #endif // ifndef INFECTIOUS_OS_UTILS_HPP

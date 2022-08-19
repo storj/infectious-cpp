@@ -41,9 +41,11 @@ public:
 	/**
 	* Probe the CPU and see what extensions are supported
 	*/
-	static void initialize();
+	static void initialize() {
+		state() = CPUID_Data();
+	}
 
-	static bool is_little_endian() {
+	[[nodiscard]] static auto is_little_endian() -> bool {
 #if defined(INFECTIOUS_TARGET_CPU_IS_LITTLE_ENDIAN)
 		return true;
 #elif defined(INFECTIOUS_TARGET_CPU_IS_BIG_ENDIAN)
@@ -53,7 +55,7 @@ public:
 #endif
 	}
 
-	static bool is_big_endian() {
+	[[nodiscard]] static auto is_big_endian() -> bool {
 #if defined(INFECTIOUS_TARGET_CPU_IS_BIG_ENDIAN)
 		return true;
 #elif defined(INFECTIOUS_TARGET_CPU_IS_LITTLE_ENDIAN)
@@ -85,47 +87,45 @@ public:
 	/**
 	* Check if the processor supports AltiVec/VMX
 	*/
-	static bool has_altivec() { return has_cpuid_bit(CPUID_ALTIVEC_BIT); }
+	static auto has_altivec() -> bool { return has_cpuid_bit(CPUID_ALTIVEC_BIT); }
 #endif
 
 #if defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY)
 	/**
 	* Check if the processor supports NEON SIMD
 	*/
-	static bool has_neon() { return has_cpuid_bit(CPUID_ARM_NEON_BIT); }
+	static auto has_neon() -> bool { return has_cpuid_bit(CPUID_ARM_NEON_BIT); }
 #endif
 
 #if defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
 	/**
 	* Check if the processor supports SSSE3
 	*/
-	static bool has_ssse3() { return has_cpuid_bit(CPUID_SSSE3_BIT); }
+	static auto has_ssse3() -> bool { return has_cpuid_bit(CPUID_SSSE3_BIT); }
 
 	/**
 	* Check if the processor supports SSE2
 	*/
-	static bool has_sse2() { return has_cpuid_bit(CPUID_SSE2_BIT); }
+	static auto has_sse2() -> bool { return has_cpuid_bit(CPUID_SSE2_BIT); }
 #endif
 
 	/**
 	* Check if the processor supports byte-level vector permutes
 	* (SSSE3, NEON, Altivec)
 	*/
-	static bool has_vperm() {
+	[[nodiscard]] static auto has_vperm() -> bool {
 #if defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
 		return has_ssse3();
 #elif defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY)
 		return has_neon();
-#elif defined(INFECTIOUS_TARGET_CPU_IS_PPC_FAMILY)
-		return has_altivec();
 #else
 		return false;
 #endif
 	}
 
 private:
-	static bool has_cpuid_bit(CPUID_bits elem) {
-		const uint64_t elem64 = static_cast<uint64_t>(elem);
+	[[nodiscard]] static auto has_cpuid_bit(CPUID_bits elem) -> bool {
+		const auto elem64 = static_cast<uint64_t>(elem);
 		return state().has_bit(elem64);
 	}
 
@@ -137,29 +137,41 @@ private:
 
 	struct CPUID_Data {
 	public:
-		CPUID_Data();
+		CPUID_Data()
+#if defined(INFECTIOUS_TARGET_CPU_IS_PPC_FAMILY) || \
+	defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY) || \
+	defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
+			: m_processor_features {detect_cpu_features() | CPUID::CPUID_INITIALIZED_BIT}
+#else
+			: m_processor_features {CPUID::CPUID_INITIALIZED_BIT}
+#endif
+			, m_endian_status {runtime_check_endian()}
+		{}
 
 		CPUID_Data(const CPUID_Data& other) = default;
-		CPUID_Data& operator=(const CPUID_Data& other) = default;
+		auto operator=(const CPUID_Data& other) -> CPUID_Data& = default;
+		CPUID_Data(CPUID_Data&& other) = default;
+		auto operator=(CPUID_Data&& other) -> CPUID_Data& = default;
+		~CPUID_Data() = default;
 
-		bool has_bit(uint64_t bit) const {
+		[[nodiscard]] auto has_bit(uint64_t bit) const -> bool {
 			return (m_processor_features & bit) == bit;
 		}
 
 	private:
-		static Endian_Status runtime_check_endian();
+		static auto runtime_check_endian() -> Endian_Status;
 
 #if defined(INFECTIOUS_TARGET_CPU_IS_PPC_FAMILY) || \
 	defined(INFECTIOUS_TARGET_CPU_IS_ARM_FAMILY) || \
 	defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
-		static uint64_t detect_cpu_features();
+		static auto detect_cpu_features() -> uint64_t;
 #endif
 
-		uint64_t m_processor_features;
-		Endian_Status m_endian_status;
+		uint64_t m_processor_features {0};
+		Endian_Status m_endian_status {0};
 	};
 
-	static CPUID_Data& state() {
+	static auto state() -> CPUID_Data& {
 		static CPUID::CPUID_Data g_cpuid;
 		return g_cpuid;
 	}

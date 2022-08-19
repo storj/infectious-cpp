@@ -9,6 +9,8 @@
 //
 // Botan is released under the Simplified BSD License (see LICENSE).
 
+#include <array>
+
 #include "cpuid.hpp"
 
 #if defined(INFECTIOUS_TARGET_CPU_IS_X86_FAMILY)
@@ -29,12 +31,12 @@ namespace infectious {
 
 namespace {
 
-void invoke_cpuid(uint32_t type, uint32_t out[4]) {
+void invoke_cpuid(uint32_t type, std::array<uint32_t, 4>& out) {
 #if defined(INFECTIOUS_BUILD_COMPILER_IS_MSVC) || defined(INFECTIOUS_BUILD_COMPILER_IS_INTEL)
-	__cpuid((int*)out, type);
+	__cpuid(reinterpret_cast<int*>(out.data()), type);
 
 #elif defined(INFECTIOUS_BUILD_COMPILER_IS_GCC) || defined(INFECTIOUS_BUILD_COMPILER_IS_CLANG)
-	__get_cpuid(type, out, out+1, out+2, out+3);
+	__get_cpuid(type, out.data(), out.data() + 1, out.data() + 2, out.data() + 3);
 
 #elif defined(INFECTIOUS_USE_GCC_INLINE_ASM)
 	asm("cpuid\n\t"
@@ -49,9 +51,9 @@ void invoke_cpuid(uint32_t type, uint32_t out[4]) {
 
 } // namespace
 
-uint64_t CPUID::CPUID_Data::detect_cpu_features() {
+auto CPUID::CPUID_Data::detect_cpu_features() -> uint64_t {
 	uint64_t features_detected = 0;
-	uint32_t cpuid[4] = { 0 };
+	std::array<uint32_t, 4> cpuid {};
 
 	// CPUID 0: vendor identification, max sublevel
 	invoke_cpuid(0, cpuid);
@@ -67,8 +69,8 @@ uint64_t CPUID::CPUID_Data::detect_cpu_features() {
 			SSSE3 = (1ULL << 41),
 		};
 
-		if (flags0 & x86_CPUID_1_bits::SSE2)  { features_detected |= CPUID::CPUID_SSE2_BIT; }
-		if (flags0 & x86_CPUID_1_bits::SSSE3) { features_detected |= CPUID::CPUID_SSSE3_BIT; }
+		if ((flags0 & x86_CPUID_1_bits::SSE2) != 0)  { features_detected |= CPUID::CPUID_SSE2_BIT; }
+		if ((flags0 & x86_CPUID_1_bits::SSSE3) != 0) { features_detected |= CPUID::CPUID_SSSE3_BIT; }
 	}
 
 	/*

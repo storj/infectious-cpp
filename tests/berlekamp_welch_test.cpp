@@ -2,28 +2,21 @@
 // See LICENSE for copying information.
 
 #include <cinttypes>
-#include <random>
 #include <tuple>
 #include <utility>
 #include <vector>
 #include "gtest/gtest.h"
 
 #include "infectious/fec.hpp"
+#include "random_env.hpp"
 
-namespace infectious {
-namespace test {
-
-// for some reason, clang-tidy doesn't much care for gtest's macros.
-// NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
-
-std::random_device rd;
-std::mt19937 generator(rd());
+namespace infectious::test {
 
 struct BerlekampWelchTest : public FEC {
 public:
 	using FEC::FEC;
 
-	[[nodiscard]] auto StoreShares() const -> std::pair<std::shared_ptr<std::map<int, std::vector<uint8_t>>>, ShareOutputFunc> {
+	[[nodiscard]] static auto StoreShares() -> std::pair<std::shared_ptr<std::map<int, std::vector<uint8_t>>>, ShareOutputFunc> {
 		auto out = std::make_shared<std::map<int, std::vector<uint8_t>>>();
 
 		return std::make_pair(out, [out](int num, ByteView output) {
@@ -32,7 +25,7 @@ public:
 		});
 	}
 
-	[[nodiscard]] auto SomeShares(int block) const -> std::pair<std::vector<uint8_t>, std::map<int, std::vector<uint8_t>>> {
+	[[nodiscard]] auto SomeShares(int block) -> std::pair<std::vector<uint8_t>, std::map<int, std::vector<uint8_t>>> {
 		// seed the initial data
 		std::vector<uint8_t> data(Required() * block);
 
@@ -50,32 +43,32 @@ public:
 		return berlekampWelch(shares, shares_nums, index);
 	}
 
-	[[nodiscard]] auto CopyShares(const std::map<int, std::vector<uint8_t>>& shares) -> std::map<int, std::vector<uint8_t>> {
+	[[nodiscard]] static auto CopyShares(const std::map<int, std::vector<uint8_t>>& shares) -> std::map<int, std::vector<uint8_t>> {
 		return shares;
 	}
 
 	static void MutateShare(int idx, std::pair<int, std::vector<uint8_t>>& share) {
 		const int byte_limit = 256;
 		auto orig = share.second[idx];
-		auto next = static_cast<uint8_t>(randn(byte_limit));
+		auto next = static_cast<uint8_t>(random_env->randn(byte_limit));
 		while (next == orig) {
-			next = static_cast<uint8_t>(randn(byte_limit));
+			next = static_cast<uint8_t>(random_env->randn(byte_limit));
 		}
 		share.second[idx] = next;
 	}
 
-	void PermuteShares(std::vector<std::pair<int, std::vector<uint8_t>>>& shares) {
+	static void PermuteShares(std::vector<std::pair<int, std::vector<uint8_t>>>& shares) {
 		for (unsigned int i = 0; i < shares.size(); i++) {
-			auto with = randn(static_cast<int>(shares.size())-i) + i;
+			auto with = random_env->randn(static_cast<int>(shares.size()-i)) + i;
 			std::swap(shares[i], shares[with]);
 		}
 	}
 
-	std::map<int, std::vector<uint8_t>> as_map(std::vector<std::pair<int, std::vector<uint8_t>>>& m) {
-		return std::map(m.begin(), m.end());
+	[[nodiscard]] static auto as_map(std::vector<std::pair<int, std::vector<uint8_t>>>& m) -> std::map<int, std::vector<uint8_t>> {
+		return {m.begin(), m.end()};
 	}
 
-	std::map<int, std::vector<uint8_t>> as_map(std::map<int, std::vector<uint8_t>>& m) {
+	[[nodiscard]] static auto as_map(std::map<int, std::vector<uint8_t>>& m) -> std::map<int, std::vector<uint8_t>>& {
 		return m;
 	}
 
@@ -86,12 +79,10 @@ public:
 
 	// can be used as a do-nothing output callback
 	static void noop(int, ByteView) {}
-
-	[[nodiscard]] static auto randn(int limit) -> int {
-		std::uniform_int_distribution<> distrib(0, limit - 1);
-		return distrib(generator);
-	}
 };
+
+// clang-tidy doesn't much care for gtest's macros.
+// NOLINTBEGIN(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
 TEST(BerlekampWelch, SingleBlock) {
 	const int block = 1;
@@ -183,8 +174,8 @@ TEST(BerlekampWelch, TestErrors) {
 	for (int i = 0; i < repetitions; i++) {
 		std::vector<std::pair<int, std::vector<uint8_t>>> shares_copy(shares.begin(), shares.end());
 		for (int j = 0; j < block; j++) {
-			test.MutateShare(j, shares_copy[test.randn(total)]);
-			test.MutateShare(j, shares_copy[test.randn(total)]);
+			test.MutateShare(j, shares_copy[random_env->randn(total)]);
+			test.MutateShare(j, shares_copy[random_env->randn(total)]);
 		}
 
 		auto [decoded_shares, callback] = test.StoreShares();
@@ -212,10 +203,10 @@ TEST(BerlekampWelch, RandomShares) {
 	for (int i = 0; i < repetitions; i++) {
 		std::vector<std::pair<int, std::vector<uint8_t>>> test_shares = shares;
 		test.PermuteShares(test_shares);
-		test_shares.resize(required+2+test.randn(total-required-2));
+		test_shares.resize(required+2+random_env->randn(total-required-2));
 
 		for (int i = 0; i < block; i++) {
-			test.MutateShare(i, test_shares[test.randn(static_cast<int>(test_shares.size()))]);
+			test.MutateShare(i, test_shares[random_env->randn(static_cast<int>(test_shares.size()))]);
 		}
 
 		auto [decoded_shares, callback] = test.StoreShares();
@@ -228,5 +219,4 @@ TEST(BerlekampWelch, RandomShares) {
 
 // NOLINTEND(cert-err58-cpp,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,modernize-use-trailing-return-type)
 
-} // namespace test
-} // namespace infectious
+} // namespace infectious::test
