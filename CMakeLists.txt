@@ -5,7 +5,8 @@ cmake_minimum_required(VERSION 3.16)
 project(
     infectious_cpp
     DESCRIPTION "Forward Error Correction in C++20"
-    LANGUAGES CXX)
+    LANGUAGES CXX
+    VERSION 0.2)
 
 #set(CMAKE_DEBUG_TARGET_PROPERTIES INCLUDE_DIRECTORIES)
 #set(CMAKE_VERBOSE_MAKEFILE on)

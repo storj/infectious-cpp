@@ -3,6 +3,8 @@
 
 set(CMAKE_CXX_STANDARD 20)
 
+include(GenerateExportHeader)
+
 set(HEADER_LIST
     "${infectious_cpp_SOURCE_DIR}/include/infectious/fec.hpp"
     "${infectious_cpp_SOURCE_DIR}/include/infectious/build_env.h"
@@ -26,5 +28,6 @@ add_library(infectious SHARED
     os_utils.cpp
     ${HEADER_LIST}
 )
+generate_export_header(infectious)
 
-target_include_directories(infectious PUBLIC ${infectious_cpp_SOURCE_DIR}/include)
+target_include_directories(infectious PUBLIC ${infectious_cpp_SOURCE_DIR}/include ${infectious_cpp_BINARY_DIR}/src)

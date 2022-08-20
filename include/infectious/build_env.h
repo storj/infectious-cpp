@@ -17,6 +17,8 @@
 #ifndef INFECTIOUS_BUILD_ENV_H
 #define INFECTIOUS_BUILD_ENV_H
 
+#include "infectious_export.h"
+
 #if !defined(INFECTIOUS_BUILD_COMPILER_SET)
 # if defined(__ibmxl__)
 #  define INFECTIOUS_BUILD_COMPILER_IS_XLC

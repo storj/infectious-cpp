@@ -19,7 +19,7 @@ namespace infectious {
 
 using namespace std::literals;
 
-class TooManyErrors : public std::runtime_error {
+class INFECTIOUS_EXPORT TooManyErrors : public std::runtime_error {
 public:
 	using std::runtime_error::runtime_error;
 
@@ -28,7 +28,7 @@ public:
 	{}
 };
 
-class NotEnoughShares : public std::out_of_range {
+class INFECTIOUS_EXPORT NotEnoughShares : public std::out_of_range {
 public:
 	using std::out_of_range::out_of_range;
 
@@ -72,7 +72,7 @@ auto share_data(const T& t) -> const decltype(t.second)& {
 
 // FEC represents operations performed on a Reed-Solomon-based
 // forward error correction code.
-class FEC {
+class INFECTIOUS_EXPORT FEC {
 public:
 	static const int byte_max = 256;
 
@@ -419,9 +419,9 @@ private:
 	std::vector<uint8_t> vand_matrix;
 };
 
-auto addmul_provider() -> std::string;
+auto INFECTIOUS_EXPORT addmul_provider() -> std::string;
 
-auto build_environment() -> const char*;
+auto INFECTIOUS_EXPORT build_environment() -> const char*;
 
 } // namespace infectious
 
